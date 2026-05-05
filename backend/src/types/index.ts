@@ -167,6 +167,28 @@ export interface SSEConnectedEvent {
   type: 'connected';
 }
 
+export interface AgentOverride {
+  modelId?: string;
+  name?: string;
+}
+
+export interface SSESessionStatusChangedEvent {
+  type: 'session_status_changed';
+  status: SessionStatus;
+}
+
+export interface SSEAgentThinkingEvent {
+  type: 'agent_thinking';
+  agentType: string;
+  agentName: string;
+  message: string;
+}
+
+export interface SSEManagerWorkingEvent {
+  type: 'manager_working';
+  message: string;
+}
+
 export type SSEEvent =
   | SSETaskCreatedEvent
   | SSETaskClaimedEvent
@@ -177,8 +199,11 @@ export type SSEEvent =
   | SSETaskSpawnedEvent
   | SSESessionCompleteEvent
   | SSEHeartbeatTickEvent
+  | SSESessionStatusChangedEvent
+  | SSEAgentThinkingEvent
   | SSEErrorEvent
-  | SSEConnectedEvent;
+  | SSEConnectedEvent
+  | SSEManagerWorkingEvent;
 
 // ─── Model / OpenRouter ───────────────────────────────────────────────────────
 

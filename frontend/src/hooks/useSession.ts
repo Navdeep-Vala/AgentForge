@@ -2,23 +2,26 @@ import { useCallback } from 'react';
 import { createSession, getSession, cancelSession } from '../api/client';
 import { useSessionStore } from '../store/sessionStore';
 import { useModelStore } from '../store/modelStore';
+import { useFeedStore } from '../store/feedStore';
 import { Session } from '../types';
 
 export function useSession() {
   const { setCurrentSession, setLoading, setError, reset } = useSessionStore();
   const { agentOverrides } = useModelStore();
+  const { clearEvents } = useFeedStore();
 
   const startSession = useCallback(async (goal: string): Promise<string | null> => {
     setLoading(true);
     setError(null);
+    clearEvents();
     try {
-      const overrides = Object.keys(agentOverrides).length > 0 ? agentOverrides : undefined;
-      const { sessionId } = await createSession(goal, overrides);
+      const activeOverrides = Object.keys(agentOverrides).length > 0 ? agentOverrides : undefined;
+      const { sessionId } = await createSession(goal, activeOverrides);
 
       const emptySession: Session = {
         id: sessionId,
         goal,
-        status: 'running',
+        status: 'pending',  // Start as pending — transitions to running when tasks are created
         final_report: null,
         total_tokens_used: 0,
         estimated_cost_usd: 0,
@@ -40,9 +43,15 @@ export function useSession() {
   const loadSession = useCallback(async (id: string): Promise<void> => {
     setLoading(true);
     setError(null);
+    clearEvents();
     try {
       const session = await getSession(id);
       setCurrentSession(session);
+
+      // If the session is cancelled with no tasks, surface the error
+      if (session.status === 'cancelled' && (!session.tasks || session.tasks.length === 0)) {
+        setError('This session was cancelled — the manager could not create tasks. Use Retry to try again.');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load session');
     } finally {
@@ -60,6 +69,7 @@ export function useSession() {
 
   const clearSession = useCallback(() => {
     reset();
+    clearEvents();
   }, []);
 
   return { startSession, loadSession, stopSession, clearSession };

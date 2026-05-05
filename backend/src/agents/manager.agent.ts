@@ -1,4 +1,6 @@
 import { callOpenRouter } from '../services/openrouter.service';
+import { routeModelCall } from '../services/model-router.service';
+import { getDynamicFallbacks } from '../services/free-model-pool.service';
 import { ManagerTaskPlan, OpenRouterMessage } from '../types';
 import { env } from '../config/env';
 
@@ -20,13 +22,6 @@ Do not include any text outside the JSON object.`;
 
 const SYNTHESIS_SYSTEM_PROMPT = `You are the Manager of an AI development team. Synthesize the team's findings into a comprehensive final report formatted as clean markdown.`;
 
-// Fallback models tried in order when the primary is rate-limited or unavailable
-const FALLBACK_MODELS = [
-  'google/gemma-4-31b-it:free',
-  'nousresearch/hermes-3-llama-3.1-405b:free',
-  'google/gemma-3-27b-it:free',
-];
-
 export class ManagerAgent {
   readonly model: string;
 
@@ -37,62 +32,66 @@ export class ManagerAgent {
   async decompose(
     goal: string,
     activeAgentDescriptions: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    modelOverride?: string
   ): Promise<ManagerTaskPlan> {
     const userMessage = `Goal: ${goal}\n\nActive agents available:\n${activeAgentDescriptions}`;
-    const messages = [
-      { role: 'system' as const, content: MANAGER_SYSTEM_PROMPT },
-      { role: 'user' as const, content: userMessage },
+    const messages: OpenRouterMessage[] = [
+      { role: 'system', content: MANAGER_SYSTEM_PROMPT },
+      { role: 'user', content: userMessage },
     ];
 
-    // Try primary model then each fallback
-    const modelsToTry = [this.model, ...FALLBACK_MODELS.filter((m) => m !== this.model)];
+    const primaryModel = modelOverride ?? this.model;
+    const triedModels: string[] = [];
     let lastError: Error = new Error('All models failed during decomposition');
 
-    for (const model of modelsToTry) {
-      if (signal?.aborted) throw new Error('Request aborted by user');
+    // Step 1: Try the primary model
+    triedModels.push(primaryModel);
+    if (!signal?.aborted) {
       try {
-        console.log(`[Manager] Decomposing with model: ${model}`);
-        const result = await callOpenRouter(model, messages, 2048, signal);
-
-        let parsed: ManagerTaskPlan;
-        try {
-          const jsonText = extractJson(result.content);
-          parsed = JSON.parse(jsonText) as ManagerTaskPlan;
-        } catch {
-          throw new Error(`Manager returned invalid JSON: ${result.content.slice(0, 200)}`);
-        }
-
-        const maybeError = (parsed as { error?: string }).error;
-        if (maybeError) {
-          throw new Error(`Not a project goal: ${maybeError}`);
-        }
-
-        if (!Array.isArray(parsed.tasks) || parsed.tasks.length === 0) {
-          throw new Error('Manager returned no tasks. Try rephrasing your goal.');
-        }
-
-        return parsed;
+        console.log(`[Manager] Decomposing with primary model: ${primaryModel}`);
+        const result = await routeModelCall(primaryModel, messages, 2048, signal);
+        return this.parseDecomposition(result.content);
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
-        const isRateLimit = lastError.message.includes('429') || lastError.message.includes('rate limit');
-        const isEmpty = lastError.message.includes('empty content');
-        if (isRateLimit || isEmpty) {
-          console.warn(`[Manager] Model ${model} unavailable (${lastError.message}), trying next fallback...`);
+        const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
+        if (!isRetryable) throw lastError;
+        console.warn(`[Manager] Primary model ${primaryModel} unavailable, fetching dynamic fallbacks...`);
+      }
+    }
+
+    // Step 2: Dynamically try all available free models
+    const dynamicFallbacks = await getDynamicFallbacks(triedModels);
+    console.log(`[Manager] Dynamic fallback pool: ${dynamicFallbacks.length} models available`);
+
+    for (const model of dynamicFallbacks) {
+      if (signal?.aborted) throw new Error('Request aborted by user');
+      triedModels.push(model);
+      try {
+        console.log(`[Manager] Trying fallback model: ${model}`);
+        const result = await routeModelCall(model, messages, 2048, signal);
+        return this.parseDecomposition(result.content);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
+        if (isRetryable) {
+          console.warn(`[Manager] Fallback model ${model} also unavailable, trying next...`);
           continue;
         }
-        // Non-rate-limit errors (invalid JSON, auth, abort) — don't retry other models
+        // Non-retryable errors (invalid JSON, auth, abort) — don't retry
         throw lastError;
       }
     }
 
+    console.error(`[Manager] All ${triedModels.length} models exhausted. Tried: ${triedModels.join(', ')}`);
     throw lastError;
   }
 
   async synthesize(
     goal: string,
     taskResults: Array<{ title: string; agentName: string; output: string | null }>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    modelOverride?: string
   ): Promise<string> {
     const taskSummaries = taskResults
       .map((t) => `## ${t.title} (by ${t.agentName})\n${t.output ?? '_No output_'}`)
@@ -105,8 +104,69 @@ export class ManagerAgent {
       { role: 'user', content: userMessage },
     ];
 
-    const result = await callOpenRouter(this.model, messages, 4096, signal);
-    return result.content;
+    const primaryModel = modelOverride ?? this.model;
+    const triedModels: string[] = [];
+    let lastError: Error = new Error('All models failed during synthesis');
+
+    // Step 1: Try the primary model
+    triedModels.push(primaryModel);
+    if (!signal?.aborted) {
+      try {
+        console.log(`[Manager] Synthesizing with primary model: ${primaryModel}`);
+        const result = await routeModelCall(primaryModel, messages, 4096, signal);
+        return result.content;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
+        if (!isRetryable) throw lastError;
+        console.warn(`[Manager] Primary model ${primaryModel} unavailable for synthesis, trying fallbacks...`);
+      }
+    }
+
+    // Step 2: Dynamically try all available free models
+    const dynamicFallbacks = await getDynamicFallbacks(triedModels);
+
+    for (const model of dynamicFallbacks) {
+      if (signal?.aborted) throw new Error('Request aborted by user');
+      triedModels.push(model);
+      try {
+        console.log(`[Manager] Synthesizing with fallback model: ${model}`);
+        const result = await routeModelCall(model, messages, 4096, signal);
+        return result.content;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
+        if (isRetryable) {
+          console.warn(`[Manager] Synthesis fallback ${model} unavailable, trying next...`);
+          continue;
+        }
+        throw lastError;
+      }
+    }
+
+    console.error(`[Manager] Synthesis: all ${triedModels.length} models exhausted.`);
+    throw lastError;
+  }
+
+  private parseDecomposition(content: string): ManagerTaskPlan {
+    let parsed: ManagerTaskPlan;
+    try {
+      const jsonText = extractJson(content);
+      parsed = JSON.parse(jsonText) as ManagerTaskPlan;
+    } catch {
+      throw new Error(`Manager returned invalid JSON: ${content.slice(0, 200)}`);
+    }
+
+    const maybeError = (parsed as { error?: string }).error;
+    if (maybeError) {
+      throw new Error(`Not a project goal: ${maybeError}`);
+    }
+
+    if (!Array.isArray(parsed.tasks) || parsed.tasks.length === 0) {
+      throw new Error('Manager returned no tasks. Try rephrasing your goal.');
+    }
+
+    return parsed;
   }
 }
 

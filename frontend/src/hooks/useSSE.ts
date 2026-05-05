@@ -92,6 +92,12 @@ export function useSSE(sessionId: string | null): void {
             started_at: null,
             completed_at: null,
           });
+          addEvent({
+            type: 'task_started',
+            message: `Task created: ${msg.task.title}`,
+            agentName: msg.task.agent_name,
+            agentColor: getAgentColor(msg.task.agent_type),
+          });
           if (msg.task.spawned_by_agent) {
             addEvent({
               type: 'task_spawned',
@@ -135,7 +141,7 @@ export function useSSE(sessionId: string | null): void {
           addComment(msg.comment);
           addEvent({
             type: 'task_comment',
-            message: `${msg.comment.comment_type}: ${msg.comment.content.slice(0, 80)}...`,
+            message: `${msg.comment.comment_type}: ${msg.comment.content}`,
             agentName: msg.comment.agent_name,
             agentColor: getAgentColor(msg.comment.agent_type),
           });
@@ -145,7 +151,7 @@ export function useSSE(sessionId: string | null): void {
           addChatMessage(msg.message);
           addEvent({
             type: 'chat_message',
-            message: msg.message.content.slice(0, 80),
+            message: msg.message.content,
             agentName: msg.message.agent_name,
             agentColor: getAgentColor(msg.message.agent_type),
           });
@@ -165,6 +171,27 @@ export function useSSE(sessionId: string | null): void {
           break;
 
         case 'connected':
+          break;
+        
+        case 'manager_working':
+          addEvent({
+            type: 'manager_working',
+            message: msg.message,
+            agentName: 'Manager',
+          });
+          break;
+
+        case 'session_status_changed':
+          setSessionStatus(msg.status);
+          break;
+
+        case 'agent_thinking':
+          addEvent({
+            type: 'manager_working', // Reuse config or add new
+            message: msg.message,
+            agentName: msg.agentName,
+            agentColor: getAgentColor(msg.agentType),
+          });
           break;
 
         default:

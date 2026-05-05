@@ -3,57 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { upsertModelConfig, getAllModelConfigs, deleteModelConfig } from '../db/queries';
 import { encrypt } from '../services/crypto.service';
-import { FreeModel } from '../types';
-import { env } from '../config/env';
+import { getAvailableFreeModels } from '../services/free-model-pool.service';
 
-// ─── Live free-model cache (5-minute TTL) ─────────────────────────────────────
-
-const FALLBACK_FREE_MODELS: FreeModel[] = [
-  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B', provider: 'Meta', best_for: 'Planning, reasoning, manager tasks' },
-  { id: 'qwen/qwen3-coder:free', name: 'Qwen3 Coder 480B', provider: 'Qwen', best_for: 'Code generation (best free coding model)' },
-  { id: 'google/gemma-4-31b-it:free', name: 'Gemma 4 31B', provider: 'Google', best_for: 'Research, general tasks' },
-  { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron Super 120B', provider: 'NVIDIA', best_for: 'Analysis, R&D, reasoning' },
-  { id: 'nousresearch/hermes-3-llama-3.1-405b:free', name: 'Hermes 3 405B', provider: 'NousResearch', best_for: 'Complex reasoning, large context' },
-  { id: 'google/gemma-3-27b-it:free', name: 'Gemma 3 27B', provider: 'Google', best_for: 'Lightweight fallback' },
-];
-
-let cachedFreeModels: FreeModel[] | null = null;
-let cacheExpiresAt = 0;
-const CACHE_TTL_MS = 5 * 60 * 1000;
-
-async function getLiveFreeModels(): Promise<FreeModel[]> {
-  if (cachedFreeModels && Date.now() < cacheExpiresAt) {
-    return cachedFreeModels;
-  }
-
-  try {
-    const res = await fetch('https://openrouter.ai/api/v1/models', {
-      headers: { Authorization: `Bearer ${env.OPENROUTER_API_KEY}` },
-      signal: AbortSignal.timeout(8000),
-    });
-
-    if (!res.ok) throw new Error(`OpenRouter ${res.status}`);
-
-    const data = (await res.json()) as { data: Array<{ id: string; name: string; context_length: number }> };
-
-    const models: FreeModel[] = data.data
-      .filter((m) => m.id.endsWith(':free'))
-      .map((m) => ({
-        id: m.id,
-        name: m.name,
-        provider: m.id.split('/')[0],
-        best_for: '',
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    cachedFreeModels = models;
-    cacheExpiresAt = Date.now() + CACHE_TTL_MS;
-    return models;
-  } catch (err) {
-    console.warn('[ModelController] Could not fetch live free models, using fallback:', err);
-    return cachedFreeModels ?? FALLBACK_FREE_MODELS;
-  }
-}
 
 const BYOK_MODELS = [
   { id: 'openai/gpt-4o', name: 'GPT-4o', provider: 'openai' },
@@ -76,7 +27,7 @@ const testKeySchema = z.object({
 
 export async function listModelsHandler(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const [freeModels, configs] = await Promise.all([getLiveFreeModels(), getAllModelConfigs()]);
+    const [freeModels, configs] = await Promise.all([getAvailableFreeModels(), getAllModelConfigs()]);
     const configuredProviders = new Set(configs.filter((c) => c.is_active && c.api_key_encrypted).map((c) => c.provider));
 
     const byok = BYOK_MODELS.map((m) => ({

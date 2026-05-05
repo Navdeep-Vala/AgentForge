@@ -19,7 +19,7 @@ import {
   buildTaskSummary,
 } from '../agents/heartbeat.agent';
 import { emitSSE } from '../controllers/sse.controller';
-import { Task, ChatMessage, CustomAgent } from '../types';
+import { Task, ChatMessage, CustomAgent, AgentOverride } from '../types';
 
 type HeartbeatDispatcher = (task: Task) => void;
 
@@ -31,7 +31,8 @@ export async function triggerImmediateHeartbeat(
   sessionId: string,
   completedTask: Task,
   dispatchNewTask: HeartbeatDispatcher,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  agentOverrides?: Record<string, AgentOverride>
 ): Promise<void> {
   if (signal?.aborted) return;
 
@@ -55,7 +56,7 @@ export async function triggerImmediateHeartbeat(
       const commentary = await generateTaskCommentary(
         agent.name,
         agent.systemPrompt,
-        agent.model,
+        agentOverrides?.[agent.type]?.modelId ?? agent.model,
         completedTask.agent_name,
         completedTask.title,
         completedTask.output,
@@ -84,7 +85,7 @@ export async function triggerImmediateHeartbeat(
 
 // ─── Scheduled heartbeat (chat contributions + task spawning) ──────────────────
 
-async function runScheduledHeartbeat(sessionId: string, sessionGoal: string, dispatchNewTask: HeartbeatDispatcher): Promise<void> {
+async function runScheduledHeartbeat(sessionId: string, sessionGoal: string, dispatchNewTask: HeartbeatDispatcher, agentOverrides?: Record<string, AgentOverride>): Promise<void> {
   const windowMs = Date.now() - 30 * 60 * 1000; // last 30 minutes
   const recentTasks = await getRecentDoneTasksBySession(sessionId, windowMs);
   const recentChat = await getRecentChatMessages(sessionId, windowMs);
@@ -106,7 +107,7 @@ async function runScheduledHeartbeat(sessionId: string, sessionGoal: string, dis
       const contribution = await generateChatContribution(
         agent.name,
         agent.systemPrompt,
-        agent.model,
+        agentOverrides?.[agent.type]?.modelId ?? agent.model,
         sessionGoal,
         taskSummary,
         recentChat
@@ -144,7 +145,7 @@ async function runScheduledHeartbeat(sessionId: string, sessionGoal: string, dis
 
   const allRecentChat = [...recentChat, ...newChatMessages];
   const spawnPlans = await generateTaskSpawnPlan(
-    env.MANAGER_MODEL,
+    agentOverrides?.manager?.modelId ?? env.MANAGER_MODEL,
     sessionGoal,
     agentList,
     existingTitles,
@@ -156,7 +157,7 @@ async function runScheduledHeartbeat(sessionId: string, sessionGoal: string, dis
     if (currentCount >= env.MAX_AUTO_SPAWNED_TASKS) break;
 
     const customAgentMap = new Map<string, CustomAgent>(customAgents.map((a) => [a.type, a]));
-    const displayInfo = getAgentDisplayInfo(plan.agent_type, customAgentMap);
+    const displayInfo = getAgentDisplayInfo(plan.agent_type, customAgentMap, agentOverrides);
 
     const spawnedTask: Task = {
       id: uuidv4(),
@@ -207,12 +208,13 @@ export function startHeartbeatJob(
   sessionId: string,
   sessionGoal: string,
   intervalMinutes: number,
-  dispatchNewTask: HeartbeatDispatcher
+  dispatchNewTask: HeartbeatDispatcher,
+  agentOverrides?: Record<string, AgentOverride>
 ): void {
   const cronExpr = `*/${intervalMinutes} * * * *`;
 
   const job = cron.schedule(cronExpr, () => {
-    runScheduledHeartbeat(sessionId, sessionGoal, dispatchNewTask).catch((err) =>
+    runScheduledHeartbeat(sessionId, sessionGoal, dispatchNewTask, agentOverrides).catch((err) =>
       console.error(`[Heartbeat] Session ${sessionId} scheduled tick error:`, err)
     );
   });

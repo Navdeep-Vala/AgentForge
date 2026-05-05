@@ -20,7 +20,7 @@ import {
 } from '../db/queries';
 import { emitSSE, closeSseConnection } from '../controllers/sse.controller';
 import { startHeartbeatJob, stopHeartbeatJob, triggerImmediateHeartbeat } from './heartbeat.service';
-import { Session, Task, CustomAgent } from '../types';
+import { Session, Task, CustomAgent, AgentOverride } from '../types';
 
 const managerAgent = new ManagerAgent();
 const abortControllers = new Map<string, AbortController>();
@@ -28,9 +28,9 @@ const abortControllers = new Map<string, AbortController>();
 // ─── Session goal cache (needed by heartbeat dispatcher) ──────────────────────
 const sessionGoals = new Map<string, string>();
 
-function dispatchSpawnedTask(sessionId: string, signal: AbortSignal, modelOverrides?: Record<string, string>) {
+function dispatchSpawnedTask(sessionId: string, signal: AbortSignal, agentOverrides?: Record<string, AgentOverride>) {
   return (task: Task): void => {
-    runTask(task, sessionId, signal, modelOverrides).catch((err) =>
+    runTask(task, sessionId, signal, agentOverrides).catch((err) =>
       console.error(`[Orchestrator] Spawned task ${task.id} error:`, err)
     );
   };
@@ -38,7 +38,7 @@ function dispatchSpawnedTask(sessionId: string, signal: AbortSignal, modelOverri
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
-export async function startSession(sessionId: string, goal: string, modelOverrides?: Record<string, string>): Promise<void> {
+export async function startSession(sessionId: string, goal: string, agentOverrides?: Record<string, AgentOverride>): Promise<void> {
   const controller = new AbortController();
   abortControllers.set(sessionId, controller);
   sessionGoals.set(sessionId, goal);
@@ -64,7 +64,8 @@ export async function startSession(sessionId: string, goal: string, modelOverrid
 
     let plan;
     try {
-      plan = await managerAgent.decompose(goal, agentDescriptions, signal);
+      emitSSE(sessionId, { type: 'manager_working', message: 'Decomposing goal into actionable tasks...' });
+      plan = await managerAgent.decompose(goal, agentDescriptions, signal, agentOverrides?.manager?.modelId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await updateSessionStatus(sessionId, 'cancelled', Date.now());
@@ -92,7 +93,7 @@ export async function startSession(sessionId: string, goal: string, modelOverrid
     const customAgentMap = new Map<string, CustomAgent>(customAgents.map((a) => [a.type, a]));
 
     const taskRecords: Task[] = plan.tasks.map((pt) => {
-      const displayInfo = getAgentDisplayInfo(pt.agent_type, customAgentMap);
+      const displayInfo = getAgentDisplayInfo(pt.agent_type, customAgentMap, agentOverrides);
       const createdAt = Date.now();
       return {
         id: uuidv4(),
@@ -117,6 +118,7 @@ export async function startSession(sessionId: string, goal: string, modelOverrid
     }
 
     await updateSessionStatus(sessionId, 'running', Date.now());
+    emitSSE(sessionId, { type: 'session_status_changed', status: 'running' });
 
     // Emit task_created for each initial task
     for (const task of taskRecords) {
@@ -140,11 +142,12 @@ export async function startSession(sessionId: string, goal: string, modelOverrid
       sessionId,
       goal,
       session.heartbeat_interval_minutes,
-      dispatchSpawnedTask(sessionId, signal, modelOverrides)
+      dispatchSpawnedTask(sessionId, signal, agentOverrides),
+      agentOverrides
     );
 
     // Run all initial tasks in parallel
-    const taskPromises = taskRecords.map((task) => runTask(task, sessionId, signal, modelOverrides));
+    const taskPromises = taskRecords.map((task) => runTask(task, sessionId, signal, agentOverrides));
     await Promise.allSettled(taskPromises);
 
     if (signal.aborted) {
@@ -176,7 +179,8 @@ export async function startSession(sessionId: string, goal: string, modelOverrid
 
     let finalReport: string;
     try {
-      finalReport = await managerAgent.synthesize(goal, taskOutputs, signal);
+      emitSSE(sessionId, { type: 'manager_working', message: 'Synthesizing final report...' });
+      finalReport = await managerAgent.synthesize(goal, taskOutputs, signal, agentOverrides?.manager?.modelId);
     } catch (err) {
       finalReport = `## Final Report\n\n_Synthesis failed: ${err instanceof Error ? err.message : String(err)}_\n\n${taskOutputs.map((t) => `### ${t.title}\n${t.output}`).join('\n\n')}`;
     }
@@ -213,7 +217,7 @@ export async function startSession(sessionId: string, goal: string, modelOverrid
 
 // ─── Run a single task ────────────────────────────────────────────────────────
 
-async function runTask(task: Task, sessionId: string, signal: AbortSignal, modelOverrides?: Record<string, string>): Promise<void> {
+async function runTask(task: Task, sessionId: string, signal: AbortSignal, agentOverrides?: Record<string, AgentOverride>): Promise<void> {
   const startedAt = Date.now();
   await updateTaskStatus(task.id, 'in_progress', startedAt);
 
@@ -226,7 +230,7 @@ async function runTask(task: Task, sessionId: string, signal: AbortSignal, model
   });
 
   try {
-    const result = await executeAgentTask(task.agent_type, task.description, signal, modelOverrides?.[task.agent_type]);
+    const result = await executeAgentTask(task.agent_type, task.description, signal, agentOverrides?.[task.agent_type]?.modelId);
     const completedAt = Date.now();
 
     await updateTaskComplete(task.id, 'done', result.content, result.tokensUsed, result.modelUsed, completedAt);
@@ -260,8 +264,9 @@ async function runTask(task: Task, sessionId: string, signal: AbortSignal, model
       triggerImmediateHeartbeat(
         sessionId,
         completedTask,
-        dispatchSpawnedTask(sessionId, signal, modelOverrides),
-        signal
+        dispatchSpawnedTask(sessionId, signal, agentOverrides),
+        signal,
+        agentOverrides
       ).catch((err) =>
         console.error(`[Orchestrator] Immediate heartbeat error for task ${task.id}:`, err)
       );

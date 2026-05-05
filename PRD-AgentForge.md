@@ -1367,3 +1367,10 @@ The build is complete when ALL of the following pass:
 - Multiple squad groups (marketing squad, dev squad, etc. as separate tabs)
 - Per-agent token budget limits (stop an agent from spending too many tokens)
 ```
+
+# Research
+- The setup was wild. Each agent had a name from the MCU. Jarvis, the lead. Shuri, the engineer. Fury, the project manager. They communicated through a shared Convex database. They @mentioned each other. They ran daily standups. They operated autonomously around the clock.
+- The agents don't just work in isolation. They communicate, delegate, review each other's work, and maintain shared context. It's the closest thing to an AI team.
+- There should be smaller sub-agents specialized for certain tasks. For example, there should be multiple coder agents, each specializing in a different programming language. or a agent that is specialized in excel tasks.
+- and the manager can use this agent as per the requirements. so if a task is assigned to a agent, the agent can delegate the task to the sub-agents as per the requirements.
+- and can create this agents as per the need and keep them in the backup, so they are not actively working or taking part in all decisions and only work for the task they are given.

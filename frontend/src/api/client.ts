@@ -8,8 +8,8 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-export async function createSession(goal: string, modelOverrides?: Record<string, string>): Promise<{ sessionId: string; status: string }> {
-  const res = await api.post<{ sessionId: string; status: string }>('/sessions', { goal, modelOverrides });
+export async function createSession(goal: string, agentOverrides?: Record<string, { modelId?: string; name?: string }>): Promise<{ sessionId: string; status: string }> {
+  const res = await api.post<{ sessionId: string; status: string }>('/sessions', { goal, agentOverrides });
   return res.data;
 }
 

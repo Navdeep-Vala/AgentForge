@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, AlertTriangle, Loader2 } from 'lucide-react';
 import { useSessionStore } from '../../store/sessionStore';
 import { KanbanColumn } from './KanbanColumn';
 import { FinalReport } from '../FinalReport/FinalReport';
@@ -7,7 +7,7 @@ import { OutputModal } from '../OutputModal/OutputModal';
 import { Task } from '../../types';
 
 export function MissionQueue() {
-  const { currentSession } = useSessionStore();
+  const { currentSession, error } = useSessionStore();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const tasks = currentSession?.tasks ?? [];
 
@@ -16,6 +16,7 @@ export function MissionQueue() {
   const done       = tasks.filter(t => t.status === 'done');
   const failed     = tasks.filter(t => t.status === 'failed' || t.status === 'cancelled');
 
+  // No session at all — show welcome state
   if (!currentSession) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-6">
@@ -43,6 +44,59 @@ export function MissionQueue() {
     );
   }
 
+  // Session exists but failed before creating any tasks
+  if (currentSession.status === 'cancelled' && tasks.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-6">
+        <div className="w-14 h-14 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+          <AlertTriangle size={24} className="text-red-500" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-app-text">Session Failed</p>
+          <p className="text-xs text-app-muted mt-1 max-w-md">
+            {error || 'The session was cancelled before tasks could be created.'}
+          </p>
+          <p className="text-xs text-app-muted mt-2">
+            Goal: <span className="text-app-text italic">"{currentSession.goal}"</span>
+          </p>
+        </div>
+        <p className="text-[10px] text-app-muted">Use the <span className="font-semibold text-amber-500">Retry</span> button above to try again</p>
+      </div>
+    );
+  }
+
+  // Session pending — manager is planning
+  if (currentSession.status === 'pending' || (currentSession.status === 'running' && tasks.length === 0)) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-6">
+        <div className="relative w-14 h-14 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center">
+          <Loader2 size={24} className="text-pink-500 animate-spin" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-app-text">Manager is analyzing your goal</p>
+          <p className="text-xs text-app-muted mt-1 max-w-md">
+            Breaking down <span className="text-app-text italic">"{currentSession.goal}"</span> into actionable tasks…
+          </p>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <div className="flex gap-1">
+            {[0,1,2].map(i => (
+              <span
+                key={i}
+                className="w-1.5 h-1.5 rounded-full bg-pink-500"
+                style={{
+                  animation: 'pulse 1.4s ease-in-out infinite',
+                  animationDelay: `${i * 0.2}s`
+                }}
+              />
+            ))}
+          </div>
+          <span className="text-[10px] text-pink-500 font-medium">This usually takes 10–30 seconds</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
       {/* Queue header */}
@@ -54,6 +108,18 @@ export function MissionQueue() {
           <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-500">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Running
+          </span>
+        )}
+        {currentSession.status === 'completed' && (
+          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-500">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Completed
+          </span>
+        )}
+        {currentSession.status === 'cancelled' && (
+          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-red-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+            Cancelled
           </span>
         )}
       </div>

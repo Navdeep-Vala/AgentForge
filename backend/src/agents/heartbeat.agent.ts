@@ -1,5 +1,6 @@
-import { callOpenRouter } from '../services/openrouter.service';
-import { CommentType, OpenRouterCallResult, Task, ChatMessage } from '../types';
+import { routeModelCall } from '../services/model-router.service';
+import { getDynamicFallbacks } from '../services/free-model-pool.service';
+import { CommentType, OpenRouterCallResult, Task, ChatMessage, OpenRouterMessage } from '../types';
 
 export interface HeartbeatCommentary {
   comment_type: CommentType;
@@ -17,6 +18,49 @@ export interface SpawnedTaskPlan {
   title: string;
   description: string;
   spawned_by: string;
+}
+
+// ─── Resilient model call with dynamic fallback ──────────────────────────────
+
+async function callWithFallback(
+  primaryModel: string,
+  messages: OpenRouterMessage[],
+  maxTokens: number,
+  signal?: AbortSignal,
+  label?: string
+): Promise<OpenRouterCallResult & { modelUsed: string }> {
+  const triedModels: string[] = [];
+
+  // Step 1: Try the primary model
+  triedModels.push(primaryModel);
+  try {
+    const result = await routeModelCall(primaryModel, messages, maxTokens, signal);
+    return { ...result, modelUsed: primaryModel };
+  } catch (err) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    const isRetryable = error.message.includes('429') || error.message.includes('rate limit') || error.message.includes('empty content');
+    if (!isRetryable) throw error;
+    console.warn(`[${label ?? 'Heartbeat'}] Primary model ${primaryModel} unavailable, trying fallbacks...`);
+  }
+
+  // Step 2: Dynamically try all available free models
+  const fallbacks = await getDynamicFallbacks(triedModels);
+
+  for (const model of fallbacks) {
+    if (signal?.aborted) throw new Error('Request aborted by user');
+    triedModels.push(model);
+    try {
+      const result = await routeModelCall(model, messages, maxTokens, signal);
+      return { ...result, modelUsed: model };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      const isRetryable = error.message.includes('429') || error.message.includes('rate limit') || error.message.includes('empty content');
+      if (!isRetryable) throw error;
+      continue;
+    }
+  }
+
+  throw new Error(`[${label}] All ${triedModels.length} models exhausted`);
 }
 
 // ─── Prompt A: Per-task commentary ───────────────────────────────────────────
@@ -51,15 +95,17 @@ NO_COMMENT`;
 
   let result: OpenRouterCallResult;
   try {
-    result = await callOpenRouter(
+    const res = await callWithFallback(
       agentModel,
       [
         { role: 'system', content: agentSystemPrompt },
         { role: 'user', content: userPrompt },
       ],
       1024,
-      signal
+      signal,
+      `Heartbeat-${agentName}`
     );
+    result = res;
   } catch {
     return null;
   }
@@ -108,15 +154,17 @@ If you have nothing to share right now, respond with exactly: NO_MESSAGE`;
 
   let result: OpenRouterCallResult;
   try {
-    result = await callOpenRouter(
+    const res = await callWithFallback(
       agentModel,
       [
         { role: 'system', content: agentSystemPrompt },
         { role: 'user', content: userPrompt },
       ],
       512,
-      signal
+      signal,
+      `Chat-${agentName}`
     );
+    result = res;
   } catch {
     return null;
   }
@@ -168,12 +216,14 @@ Return JSON or the literal string NO_NEW_TASKS:
 
   let result: OpenRouterCallResult;
   try {
-    result = await callOpenRouter(
+    const res = await callWithFallback(
       managerModel,
       [{ role: 'user', content: userPrompt }],
       1024,
-      signal
+      signal,
+      'TaskSpawn'
     );
+    result = res;
   } catch {
     return [];
   }

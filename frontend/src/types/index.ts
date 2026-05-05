@@ -123,6 +123,9 @@ export type SSEMessage =
     }
   | { type: 'session_complete'; final_report: string; total_tokens: number; cost_usd: number }
   | { type: 'heartbeat_tick'; agentType: string; tasksScanned: number }
+  | { type: 'session_status_changed'; status: SessionStatus }
+  | { type: 'agent_thinking'; agentType: string; agentName: string; message: string }
+  | { type: 'manager_working'; message: string }
   | { type: 'error'; taskId: string; message: string };
 
 // ─── Model selector ───────────────────────────────────────────────────────────

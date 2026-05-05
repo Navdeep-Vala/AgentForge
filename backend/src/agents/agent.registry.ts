@@ -5,7 +5,7 @@ import { TesterAgent } from './tester.agent';
 import { RndAgent } from './rnd.agent';
 import { routeModelCall } from '../services/model-router.service';
 import { getActiveCustomAgents as dbGetActiveCustomAgents, getCustomAgentByType } from '../db/queries';
-import { CustomAgent, BuiltInAgentDefinition } from '../types';
+import { CustomAgent, BuiltInAgentDefinition, AgentOverride } from '../types';
 
 const BUILT_IN_AGENTS: Record<string, BaseAgent> = {
   researcher: new ResearcherAgent(),
@@ -73,12 +73,7 @@ export async function resolveAgent(
   return null;
 }
 
-const AGENT_FALLBACK_MODELS: Record<string, string[]> = {
-  researcher: ['nvidia/nemotron-3-super-120b-a12b:free', 'meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-3-27b-it:free'],
-  coder:      ['meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-4-31b-it:free', 'nousresearch/hermes-3-llama-3.1-405b:free'],
-  tester:     ['google/gemma-4-31b-it:free', 'meta-llama/llama-3.3-70b-instruct:free', 'google/gemma-3-27b-it:free'],
-  rnd:        ['google/gemma-4-31b-it:free', 'meta-llama/llama-3.3-70b-instruct:free', 'nousresearch/hermes-3-llama-3.1-405b:free'],
-};
+import { getDynamicFallbacks } from '../services/free-model-pool.service';
 
 export async function executeAgentTask(
   agentType: string,
@@ -94,14 +89,41 @@ export async function executeAgentTask(
   };
 
   const primaryModel = modelOverride ?? defaultModel;
-  const fallbacks = AGENT_FALLBACK_MODELS[agentType] ?? [];
-  const modelsToTry = [primaryModel, ...fallbacks.filter((m) => m !== primaryModel)];
+  const triedModels: string[] = [];
   let lastError: Error = new Error('All models failed for task execution');
 
-  for (const model of modelsToTry) {
-    if (signal?.aborted) throw new Error('Request aborted by user');
+  // Step 1: Try the primary (user-selected or default) model
+  triedModels.push(primaryModel);
+  if (!signal?.aborted) {
     try {
-      console.log(`[${agentType}] Executing with model: ${model}`);
+      console.log(`[${agentType}] Executing with primary model: ${primaryModel}`);
+      const result = await routeModelCall(
+        primaryModel,
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: taskDescription },
+        ],
+        4096,
+        signal
+      );
+      return { ...result, modelUsed: primaryModel };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
+      if (!isRetryable) throw lastError;
+      console.warn(`[${agentType}] Primary model ${primaryModel} unavailable, fetching dynamic fallbacks...`);
+    }
+  }
+
+  // Step 2: Dynamically discover all available free models and try each
+  const dynamicFallbacks = await getDynamicFallbacks(triedModels);
+  console.log(`[${agentType}] Dynamic fallback pool: ${dynamicFallbacks.length} models available`);
+
+  for (const model of dynamicFallbacks) {
+    if (signal?.aborted) throw new Error('Request aborted by user');
+    triedModels.push(model);
+    try {
+      console.log(`[${agentType}] Trying fallback model: ${model}`);
       const result = await routeModelCall(
         model,
         [
@@ -114,31 +136,42 @@ export async function executeAgentTask(
       return { ...result, modelUsed: model };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      const isRateLimit = lastError.message.includes('429') || lastError.message.includes('rate limit');
-      const isEmpty = lastError.message.includes('empty content');
-      if (isRateLimit || isEmpty) {
-        console.warn(`[${agentType}] Model ${model} unavailable, trying fallback...`);
+      const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
+      if (isRetryable) {
+        console.warn(`[${agentType}] Fallback model ${model} also unavailable, trying next...`);
         continue;
       }
       throw lastError;
     }
   }
 
+  console.error(`[${agentType}] All ${triedModels.length} models exhausted. Tried: ${triedModels.join(', ')}`);
   throw lastError;
 }
 
 export function getAgentDisplayInfo(
   agentType: string,
-  customAgentMap: Map<string, CustomAgent>
+  customAgentMap: Map<string, CustomAgent>,
+  agentOverrides?: Record<string, AgentOverride>
 ): { name: string; color: string; icon: string } {
+  const override = agentOverrides?.[agentType];
   const builtIn = BUILT_IN_AGENTS[agentType];
+
   if (builtIn) {
-    return { name: builtIn.name, color: builtIn.color, icon: builtIn.icon };
+    return {
+      name: override?.name || builtIn.name,
+      color: builtIn.color,
+      icon: builtIn.icon,
+    };
   }
 
   const custom = customAgentMap.get(agentType);
   if (custom) {
-    return { name: custom.name, color: custom.color, icon: custom.icon };
+    return {
+      name: override?.name || custom.name,
+      color: custom.color,
+      icon: custom.icon,
+    };
   }
 
   return { name: agentType, color: '#6B7280', icon: 'Bot' };

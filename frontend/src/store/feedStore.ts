@@ -11,6 +11,7 @@ export interface FeedEvent {
     | 'task_spawned'
     | 'session_complete'
     | 'session_started'
+    | 'manager_working'
     | 'error';
   message: string;
   agentName?: string;
@@ -22,6 +23,7 @@ interface FeedState {
   events: FeedEvent[];
   addEvent: (event: Omit<FeedEvent, 'id' | 'timestamp'>) => void;
   clear: () => void;
+  clearEvents: () => void;
 }
 
 export const useFeedStore = create<FeedState>((set) => ({
@@ -34,4 +36,5 @@ export const useFeedStore = create<FeedState>((set) => ({
       ].slice(0, 80),
     })),
   clear: () => set({ events: [] }),
+  clearEvents: () => set({ events: [] }),
 }));

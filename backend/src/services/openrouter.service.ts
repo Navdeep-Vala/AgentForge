@@ -56,15 +56,10 @@ export async function callOpenRouter(
       });
 
       if (response.status === 429) {
-        const delay = Math.pow(2, attempt) * 1500; // slightly longer backoff
-        lastError = new Error(
+        // Fail fast on rate limits — the dynamic fallback layer will try a different model
+        throw new Error(
           `OpenRouter rate limit (429) on model "${model}". Free models have strict limits — wait a moment and retry.`
         );
-        console.warn(`[OpenRouter] Rate limited on ${model}. Retrying in ${delay}ms (attempt ${attempt + 1}/${env.OPENROUTER_MAX_RETRIES + 1})`);
-        if (attempt < env.OPENROUTER_MAX_RETRIES) {
-          await sleep(delay);
-        }
-        continue;
       }
 
       if (!response.ok) {
@@ -112,8 +107,12 @@ export async function callOpenRouter(
       if (err instanceof Error && (err.name === 'AbortError' || err.message === 'Request aborted by user')) {
         throw new Error('Request aborted by user');
       }
-      // Re-throw non-retryable errors (401, etc.)
+      // Re-throw non-retryable errors (401, rate-limit, etc.)
       if (err instanceof Error && err.message.startsWith('Invalid OpenRouter API key')) {
+        throw err;
+      }
+      // Re-throw rate-limit errors immediately — let the dynamic fallback layer switch models
+      if (err instanceof Error && (err.message.includes('429') || err.message.includes('rate limit'))) {
         throw err;
       }
       lastError = err instanceof Error ? err : new Error(String(err));
