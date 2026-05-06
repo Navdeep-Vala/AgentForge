@@ -173,29 +173,29 @@ When all tasks settle --> Jarvis writes the final synthesis report
 
 ### Frontend
 ```
-Framework:     React 18 + TypeScript 5
-Build Tool:    Vite 5
-Styling:       Tailwind CSS 3.4
+Framework:     React 19 + TypeScript 6
+Build Tool:    Vite 8
+Styling:       Tailwind CSS 4.2 (CSS-first theme via `@theme`, `@custom-variant`, Vite plugin)
 State:         Redux Toolkit 2 + React Redux 9
-HTTP Client:   Axios 1.7
+HTTP Client:   Axios 1.16
 Real-time:     Native EventSource API (SSE)
-Icons:         Lucide React
-Drag & Drop:   @dnd-kit/core + @dnd-kit/sortable
-Markdown:      react-markdown + remark-gfm + react-syntax-highlighter
+Icons:         Lucide React 1.x
+Drag & Drop:   @dnd-kit/core 6.3 + @dnd-kit/sortable 10
+Markdown:      react-markdown 10 + remark-gfm 4 + react-syntax-highlighter 16
 ```
 
 ### Backend
 ```
 Runtime:       Node.js 20+
-Framework:     Express 5
-Language:      TypeScript 5
+Framework:     Express 5.2
+Language:      TypeScript 6
 Database:      MySQL 8+ via mysql2 (async connection pool, no ORM)
-Validation:    Zod 3
+Validation:    Zod 4
 Env Config:    dotenv + Zod
 Real-time:     Manual SSE (res.write pattern)
-Scheduling:    node-cron (for heartbeat system)
+Scheduling:    node-cron 4
 HTTP Client:   Native fetch (Node 20+)
-IDs:           uuid v10
+IDs:           uuid v14
 ```
 
 ---
@@ -308,7 +308,6 @@ frontend/
 │   └── main.tsx
 ├── index.html
 ├── vite.config.ts
-├── tailwind.config.ts
 └── package.json
 ```
 
@@ -1203,6 +1202,8 @@ VITE_API_BASE_URL=http://localhost:3001
 
 12. **Redux Toolkit store** — Use Redux Toolkit slices with React Redux hooks. Core slices: `sessionStore` (session, tasks, comments, chat messages, SSE state), `agentStore` (built-in + custom agents), `projectStore` (projects + current project), `modelStore` (model list + per-agent overrides), `themeStore` (theme preference), and `feedStore` (live event stream). Persist only non-sensitive UI preferences such as theme and model overrides in localStorage; never store raw provider API keys in frontend state.
 
+13. **Tailwind CSS 4 setup** — Use Tailwind 4 in CSS-first mode. Theme tokens live in `src/index.css` using `@theme inline`, dark mode is defined with `@custom-variant dark (&:where(.dark, .dark *))`, and the frontend build integrates Tailwind through `@tailwindcss/vite`. Do not use `tailwind.config.ts` or PostCSS-based Tailwind wiring unless a future requirement truly needs compatibility mode.
+
 ---
 
 ## 19. Package Dependencies
@@ -1214,11 +1215,10 @@ VITE_API_BASE_URL=http://localhost:3001
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
-    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend",
-    "build": "npm run build --prefix backend && npm run build --prefix frontend"
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix frontend"
   },
   "devDependencies": {
-    "concurrently": "^8.2.0"
+    "concurrently": "^9.2.1"
   }
 }
 ```
@@ -1227,21 +1227,23 @@ VITE_API_BASE_URL=http://localhost:3001
 ```json
 {
   "dependencies": {
-    "express": "^5.0.0",
-    "mysql2": "^3.9.0",
-    "zod": "^3.23.0",
-    "dotenv": "^16.4.0",
-    "uuid": "^10.0.0",
-    "cors": "^2.8.5",
-    "node-cron": "^3.0.3"
+    "@types/pdfkit": "^0.17.6",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "mysql2": "^3.22.3",
+    "node-cron": "^4.2.1",
+    "pdfkit": "^0.18.0",
+    "uuid": "^14.0.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "tsx": "^4.16.0",
-    "@types/express": "^5.0.0",
-    "@types/uuid": "^10.0.0",
-    "@types/cors": "^2.8.17",
-    "@types/node-cron": "^3.0.11"
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node-cron": "^3.0.11",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
   }
 }
 ```
@@ -1250,28 +1252,27 @@ VITE_API_BASE_URL=http://localhost:3001
 ```json
 {
   "dependencies": {
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "axios": "^1.7.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
     "@reduxjs/toolkit": "^2.11.2",
+    "axios": "^1.16.0",
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-markdown": "^10.1.0",
     "react-redux": "^9.2.0",
-    "react-markdown": "^9.0.0",
-    "remark-gfm": "^4.0.0",
-    "react-syntax-highlighter": "^15.5.0",
-    "lucide-react": "^0.400.0",
-    "@dnd-kit/core": "^6.1.0",
-    "@dnd-kit/sortable": "^8.0.0"
+    "react-syntax-highlighter": "^16.1.1",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.0",
-    "vite": "^5.3.0",
-    "typescript": "^5.5.0",
-    "tailwindcss": "^3.4.0",
-    "autoprefixer": "^10.4.0",
-    "postcss": "^8.4.0",
-    "@types/react-syntax-highlighter": "^15.5.13"
+    "@tailwindcss/vite": "^4.2.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@vitejs/plugin-react": "^6.0.1",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10"
   }
 }
 ```
