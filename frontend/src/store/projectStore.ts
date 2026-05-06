@@ -10,15 +10,12 @@ interface ProjectState {
 
   fetchProjects: () => Promise<void>;
   setCurrentProject: (project: Project | null) => void;
-  createProject: (name: string, repoUrl?: string, workspacePath?: string) => Promise<Project>;
+  createProject: (name: string, description?: string, repoUrl?: string, workspacePath?: string) => Promise<Project>;
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
 }
 
-// Extend client with project methods since we added them in backend
-// (Normally I would update client.ts, but I'll do it here if needed or just use api directly)
-
-export const useProjectStore = create<ProjectState>((set, get) => ({
+export const useProjectStore = create<ProjectState>((set) => ({
   projects: [],
   currentProject: null,
   isLoading: false,
@@ -27,7 +24,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   fetchProjects: async () => {
     set({ isLoading: true });
     try {
-      const res = await (client.api.get('/projects') as any);
+      const res = await client.api.get<Project[]>('/projects');
       set({ projects: res.data, isLoading: false });
     } catch (err: any) {
       set({ error: err.message, isLoading: false });
@@ -36,15 +33,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setCurrentProject: (project) => set({ currentProject: project }),
 
-  createProject: async (name, repoUrl, workspacePath) => {
+  createProject: async (name, description, repoUrl, workspacePath) => {
     set({ isLoading: true });
     try {
-      const res = await (client.api.post('/projects', { name, repo_url: repoUrl, workspace_path: workspacePath }) as any);
+      const res = await client.api.post<Project>('/projects', {
+        name,
+        description: description || null,
+        repo_url: repoUrl || null,
+        workspace_path: workspacePath || null,
+      });
       const newProject = res.data;
-      set((state) => ({ 
+      set((state) => ({
         projects: [newProject, ...state.projects],
         currentProject: newProject,
-        isLoading: false 
+        isLoading: false,
       }));
       return newProject;
     } catch (err: any) {
@@ -57,8 +59,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       await client.api.put(`/projects/${id}`, updates);
       set((state) => ({
-        projects: state.projects.map(p => p.id === id ? { ...p, ...updates } : p),
-        currentProject: state.currentProject?.id === id ? { ...state.currentProject, ...updates } : state.currentProject
+        projects: state.projects.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+        currentProject:
+          state.currentProject?.id === id
+            ? { ...state.currentProject, ...updates }
+            : state.currentProject,
       }));
     } catch (err: any) {
       set({ error: err.message });
@@ -70,12 +75,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       await client.api.delete(`/projects/${id}`);
       set((state) => ({
-        projects: state.projects.filter(p => p.id !== id),
-        currentProject: state.currentProject?.id === id ? null : state.currentProject
+        projects: state.projects.filter((p) => p.id !== id),
+        currentProject: state.currentProject?.id === id ? null : state.currentProject,
       }));
     } catch (err: any) {
       set({ error: err.message });
       throw err;
     }
-  }
+  },
 }));
