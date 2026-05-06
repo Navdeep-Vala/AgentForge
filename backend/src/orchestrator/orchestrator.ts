@@ -17,6 +17,7 @@ import {
   cancelSessionTasks,
   getTasksBySessionId,
   incrementSessionTokens,
+  getProjectById,
 } from '../db/queries';
 import { emitSSE, closeSseConnection } from '../controllers/sse.controller';
 import { startHeartbeatJob, stopHeartbeatJob, triggerImmediateHeartbeat } from './heartbeat.service';
@@ -68,12 +69,30 @@ export async function startSession(
   try {
     await createSession(session);
 
+    // Inject project context into goal for LLM calls (best-effort)
+    let enrichedGoal = goal;
+    if (projectId) {
+      try {
+        const project = await getProjectById(projectId);
+        if (project) {
+          const parts: string[] = [`[Project: ${project.name}]`];
+          if (project.description) parts.push(`[Description: ${project.description}]`);
+          if (project.repo_context) {
+            parts.push(`\n${project.repo_context.slice(0, 50_000)}`);
+          }
+          enrichedGoal = `${parts.join('\n')}\n\n---\nGoal: ${goal}`;
+        }
+      } catch {
+        // best-effort — proceed with original goal if project fetch fails
+      }
+    }
+
     const agentDescriptions = await getActiveAgentDescriptions();
 
     let plan;
     try {
       emitSSE(sessionId, { type: 'manager_working', message: 'Decomposing goal into actionable tasks...' });
-      plan = await managerAgent.decompose(goal, agentDescriptions, signal, agentOverrides?.manager?.modelId);
+      plan = await managerAgent.decompose(enrichedGoal, agentDescriptions, signal, agentOverrides?.manager?.modelId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await updateSessionStatus(sessionId, 'cancelled', Date.now());
