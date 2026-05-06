@@ -32,7 +32,7 @@ export async function createProject(req: Request, res: Response): Promise<void> 
 
 export async function syncProjectRepo(req: Request, res: Response): Promise<void> {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { token } = req.body;
 
     const project = await queries.getProjectById(id);
@@ -66,7 +66,7 @@ export async function getProjects(req: Request, res: Response): Promise<void> {
 
 export async function getProject(req: Request, res: Response): Promise<void> {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const project = await queries.getProjectById(id);
     if (!project) {
       res.status(404).json({ error: 'Project not found' });
@@ -80,7 +80,7 @@ export async function getProject(req: Request, res: Response): Promise<void> {
 
 export async function updateProject(req: Request, res: Response): Promise<void> {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { name, description, repo_url, workspace_path, repo_context } = req.body;
     const updates: Record<string, unknown> = { updated_at: Date.now() };
     if (name !== undefined) updates.name = name;
@@ -97,7 +97,7 @@ export async function updateProject(req: Request, res: Response): Promise<void> 
 
 export async function deleteProject(req: Request, res: Response): Promise<void> {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     await queries.deleteProject(id);
     res.json({ success: true });
   } catch (err: any) {
