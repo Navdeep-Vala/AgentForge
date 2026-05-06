@@ -81,8 +81,14 @@ export async function getProject(req: Request, res: Response): Promise<void> {
 export async function updateProject(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;
-    const updates = req.body;
-    await queries.updateProject(id, { ...updates, updated_at: Date.now() });
+    const { name, description, repo_url, workspace_path, repo_context } = req.body;
+    const updates: Record<string, unknown> = { updated_at: Date.now() };
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (repo_url !== undefined) updates.repo_url = repo_url;
+    if (workspace_path !== undefined) updates.workspace_path = workspace_path;
+    if (repo_context !== undefined) updates.repo_context = repo_context;
+    await queries.updateProject(id, updates);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

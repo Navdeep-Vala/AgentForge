@@ -29,9 +29,9 @@ const abortControllers = new Map<string, AbortController>();
 // ─── Session goal cache (needed by heartbeat dispatcher) ──────────────────────
 const sessionGoals = new Map<string, string>();
 
-function dispatchSpawnedTask(sessionId: string, signal: AbortSignal, agentOverrides?: Record<string, AgentOverride>) {
+function dispatchSpawnedTask(sessionId: string, workspaceDir: string | null | undefined, signal: AbortSignal, agentOverrides?: Record<string, AgentOverride>) {
   return (task: Task): void => {
-    runTask(task, sessionId, signal, agentOverrides).catch((err) =>
+    runTask(task, sessionId, workspaceDir, signal, agentOverrides).catch((err) =>
       console.error(`[Orchestrator] Spawned task ${task.id} error:`, err)
     );
   };
@@ -169,7 +169,7 @@ export async function startSession(
       sessionId,
       enrichedGoal,
       session.heartbeat_interval_minutes,
-      dispatchSpawnedTask(sessionId, signal, agentOverrides),
+      dispatchSpawnedTask(sessionId, workspaceDir, signal, agentOverrides),
       agentOverrides
     );
 
@@ -305,7 +305,7 @@ async function runTask(
       triggerImmediateHeartbeat(
         sessionId,
         completedTask,
-        dispatchSpawnedTask(sessionId, signal, agentOverrides),
+        dispatchSpawnedTask(sessionId, workspaceDir, signal, agentOverrides),
         signal,
         agentOverrides
       ).catch((err) =>
