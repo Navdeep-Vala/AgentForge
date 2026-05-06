@@ -4,12 +4,14 @@ import { useSessionStore } from '../../store/sessionStore';
 import { useThemeStore }   from '../../store/themeStore';
 import { listSessions }    from '../../api/client';
 import { SessionSummary }  from '../../types';
+import { ProjectSelector } from '../ProjectSelector/ProjectSelector';
+import { useProjectStore }  from '../../store/projectStore';
 
 interface AppHeaderProps {
   onManageAgents:  () => void;
   onSelectModels:  () => void;
   onLoadSession:   (id: string) => Promise<void>;
-  onStart:         (goal: string) => Promise<string | null>;
+  onStart:         (goal: string, projectId?: string, workspaceDir?: string) => Promise<string | null>;
   onCancel:        () => void;
 }
 
@@ -23,6 +25,7 @@ function useClock() {
 export function AppHeader({ onManageAgents, onSelectModels, onLoadSession, onStart, onCancel }: AppHeaderProps) {
   const { currentSession, error, setError } = useSessionStore();
   const { theme, toggle }  = useThemeStore();
+  const { currentProject } = useProjectStore();
   const time               = useClock();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sessions, setSessions]       = useState<SessionSummary[]>([]);
@@ -47,14 +50,14 @@ export function AppHeader({ onManageAgents, onSelectModels, onLoadSession, onSta
     setGoalError('');
     setGoal('');
     setError(null);
-    await onStart(g);
+    await onStart(g, currentProject?.id, currentProject?.workspace_path ?? undefined);
   };
 
   const handleRetry = async () => {
     if (!currentSession?.goal) return;
     const retryGoal = currentSession.goal;
     setError(null);
-    await onStart(retryGoal);
+    await onStart(retryGoal, currentProject?.id, currentProject?.workspace_path ?? undefined);
   };
 
   return (
@@ -73,6 +76,8 @@ export function AppHeader({ onManageAgents, onSelectModels, onLoadSession, onSta
             </span>
           )}
         </div>
+
+        <ProjectSelector />
 
         {/* Goal input */}
         <div className="flex-1 flex flex-col gap-0.5 max-w-xl mx-auto">
