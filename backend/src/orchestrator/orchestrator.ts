@@ -48,7 +48,6 @@ export async function startSession(
 ): Promise<void> {
   const controller = new AbortController();
   abortControllers.set(sessionId, controller);
-  sessionGoals.set(sessionId, goal);
   const { signal } = controller;
 
   const now = Date.now();
@@ -78,7 +77,7 @@ export async function startSession(
           const parts: string[] = [`[Project: ${project.name}]`];
           if (project.description) parts.push(`[Description: ${project.description}]`);
           if (project.repo_context) {
-            parts.push(`\n${project.repo_context.slice(0, 50_000)}`);
+            parts.push(`[Repository Context:]\n${project.repo_context.slice(0, 50_000)}`);
           }
           enrichedGoal = `${parts.join('\n')}\n\n---\nGoal: ${goal}`;
         }
@@ -86,6 +85,7 @@ export async function startSession(
         // best-effort — proceed with original goal if project fetch fails
       }
     }
+    sessionGoals.set(sessionId, enrichedGoal);
 
     const agentDescriptions = await getActiveAgentDescriptions();
 
@@ -167,7 +167,7 @@ export async function startSession(
     // Start scheduled heartbeat
     startHeartbeatJob(
       sessionId,
-      goal,
+      enrichedGoal,
       session.heartbeat_interval_minutes,
       dispatchSpawnedTask(sessionId, signal, agentOverrides),
       agentOverrides
