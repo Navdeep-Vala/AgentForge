@@ -104,3 +104,8 @@ export async function deleteApiKey(provider: string): Promise<void> {
 export function getSseUrl(sessionId: string): string {
   return `${BASE_URL}/api/sse/${sessionId}`;
 }
+
+export async function syncProjectRepo(id: string): Promise<{ size: number }> {
+  const res = await api.post<{ success: boolean; size: number }>(`/projects/${id}/sync`, {});
+  return res.data;
+}

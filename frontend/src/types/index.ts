@@ -5,7 +5,9 @@ export type CommentType = 'insight' | 'review' | 'refute' | 'praise' | 'question
 export interface Project {
   id: string;
   name: string;
+  description: string | null;
   repo_url: string | null;
+  repo_context: string | null;
   workspace_path: string | null;
   created_at: number;
   updated_at: number;
