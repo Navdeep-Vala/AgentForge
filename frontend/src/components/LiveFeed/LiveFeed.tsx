@@ -1,4 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useFeedStore, FeedEvent } from '../../store/feedStore';
 import { useSessionStore } from '../../store/sessionStore';
 import {
@@ -28,6 +32,83 @@ const AGENT_COLORS: Record<string, string> = {
   rnd: '#8B5CF6',
   manager: '#F97316',
 };
+
+// ─── Shared markdown renderer ─────────────────────────────────────────────────
+
+function MarkdownBody({ children, compact = false }: { children: string; compact?: boolean }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        code({ className, children: codeChildren, ...props }) {
+          const match = /language-(\w+)/.exec(className ?? '');
+          return !match ? (
+            <code
+              className="bg-app-col rounded px-1 py-0.5 font-mono text-indigo-400"
+              style={{ fontSize: compact ? '0.68rem' : '0.75rem' }}
+              {...props}
+            >
+              {codeChildren}
+            </code>
+          ) : (
+            <SyntaxHighlighter
+              style={oneDark}
+              language={match[1]}
+              PreTag="div"
+              customStyle={{
+                borderRadius: '6px',
+                margin: '0.25rem 0',
+                fontSize: compact ? '0.68rem' : '0.75rem',
+                overflowX: 'auto',
+              }}
+            >
+              {String(codeChildren).replace(/\n$/, '')}
+            </SyntaxHighlighter>
+          );
+        },
+        p({ children: c }) { return <p className="mb-1 last:mb-0 leading-relaxed">{c}</p>; },
+        h1({ children: c }) { return <h1 className="text-[12px] font-bold mt-2 mb-1 text-app-text">{c}</h1>; },
+        h2({ children: c }) { return <h2 className="text-[11px] font-bold mt-2 mb-0.5 text-app-text">{c}</h2>; },
+        h3({ children: c }) { return <h3 className="text-[10px] font-semibold mt-1.5 mb-0.5 text-app-text">{c}</h3>; },
+        ul({ children: c }) { return <ul className="list-disc list-outside pl-3.5 mb-1 space-y-0.5">{c}</ul>; },
+        ol({ children: c }) { return <ol className="list-decimal list-outside pl-3.5 mb-1 space-y-0.5">{c}</ol>; },
+        li({ children: c }) { return <li className="leading-relaxed">{c}</li>; },
+        strong({ children: c }) { return <strong className="font-semibold text-app-text">{c}</strong>; },
+        em({ children: c }) { return <em className="italic text-app-sub">{c}</em>; },
+        blockquote({ children: c }) {
+          return (
+            <blockquote className="border-l-2 border-app-border pl-2 my-1 text-app-muted italic">
+              {c}
+            </blockquote>
+          );
+        },
+        a({ href, children: c }) {
+          return (
+            <a href={href} className="text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer">
+              {c}
+            </a>
+          );
+        },
+        table({ children: c }) {
+          return (
+            <div className="overflow-x-auto my-1">
+              <table className="text-[9px] border-collapse w-full">{c}</table>
+            </div>
+          );
+        },
+        th({ children: c }) {
+          return <th className="border border-app-border px-1.5 py-0.5 text-left font-semibold bg-app-col">{c}</th>;
+        },
+        td({ children: c }) {
+          return <td className="border border-app-border px-1.5 py-0.5">{c}</td>;
+        },
+        hr() { return <hr className="border-app-border my-2" />; },
+      }}
+    >
+      {children}
+    </ReactMarkdown>
+  );
+}
 
 function timeAgo(ts: number): string {
   const secs = Math.floor((Date.now() - ts) / 1000);
@@ -256,10 +337,10 @@ function ChatBubble({ entry }: { entry: ChatEntry }) {
           {commentBadge}
           <span className="text-[9px] text-app-muted tabular-nums ml-auto">{timeAgo(entry.timestamp)}</span>
         </div>
-        <div className="text-[10px] text-app-sub leading-relaxed whitespace-pre-wrap break-words">
-          {entry.content.length > 500
-            ? <ExpandableText text={entry.content} />
-            : entry.content
+        <div className="text-[10px] text-app-sub">
+          {entry.content.length > 600
+            ? <ExpandableMarkdown text={entry.content} />
+            : <MarkdownBody compact>{entry.content}</MarkdownBody>
           }
         </div>
       </div>
@@ -267,15 +348,17 @@ function ChatBubble({ entry }: { entry: ChatEntry }) {
   );
 }
 
-function ExpandableText({ text }: { text: string }) {
+function ExpandableMarkdown({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
+  const displayText = expanded ? text : text.slice(0, 600);
 
   return (
     <>
-      {expanded ? text : text.slice(0, 500) + '…'}
+      <MarkdownBody compact>{displayText}</MarkdownBody>
+      {!expanded && <span className="text-app-muted text-[9px]">…</span>}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="text-[9px] font-semibold text-blue-400 hover:text-blue-300 ml-1"
+        className="block text-[9px] font-semibold text-blue-400 hover:text-blue-300 mt-0.5"
       >
         {expanded ? 'Show less' : 'Show more'}
       </button>
@@ -320,10 +403,8 @@ function EventDetailModal({ event, onClose }: { event: FeedEvent; onClose: () =>
         </div>
 
         {/* Content */}
-        <div className="px-5 py-4 max-h-80 overflow-y-auto">
-          <p className="text-[12px] text-app-text leading-relaxed whitespace-pre-wrap break-words">
-            {event.message}
-          </p>
+        <div className="px-5 py-4 max-h-80 overflow-y-auto text-[12px] text-app-text">
+          <MarkdownBody>{event.message}</MarkdownBody>
         </div>
 
         {/* Footer with agent color bar */}
