@@ -2,16 +2,51 @@ export type SessionStatus = 'pending' | 'running' | 'completed' | 'cancelled';
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled';
 export type CommentType = 'insight' | 'review' | 'refute' | 'praise' | 'question';
 
+export interface Project {
+  id: string;
+  name: string;
+  description: string | null;
+  repo_url: string | null;
+  repo_context: string | null;
+  workspace_path: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface Session {
   id: string;
+  project_id: string | null;
   goal: string;
   status: SessionStatus;
+  workspace_dir: string | null;
   final_report: string | null;
   total_tokens_used: number;
   estimated_cost_usd: number;
   heartbeat_interval_minutes: number;
   created_at: number;
   updated_at: number;
+}
+
+export interface AgentStep {
+  id: string;
+  task_id: string;
+  step_number: number;
+  tool_name: string;
+  tool_args: any;
+  tool_output: string | null;
+  tokens_used: number;
+  duration_ms: number;
+  created_at: number;
+}
+
+export interface FileChange {
+  id: string;
+  session_id: string;
+  task_id: string;
+  file_path: string;
+  change_type: 'created' | 'modified' | 'deleted';
+  diff_content: string | null;
+  created_at: number;
 }
 
 export interface Task {
@@ -189,6 +224,32 @@ export interface SSEManagerWorkingEvent {
   message: string;
 }
 
+export interface SSEAgentToolUseEvent {
+  type: 'agent_tool_use';
+  taskId: string;
+  agentType: string;
+  toolName: string;
+  toolArgs: any;
+  iteration: number;
+}
+
+export interface SSEAgentToolResultEvent {
+  type: 'agent_tool_result';
+  taskId: string;
+  agentType: string;
+  toolName: string;
+  output: string;
+  success: boolean;
+}
+
+export interface SSEFileChangedEvent {
+  type: 'file_changed';
+  sessionId: string;
+  taskId: string;
+  filePath: string;
+  changeType: 'created' | 'modified' | 'deleted';
+}
+
 export type SSEEvent =
   | SSETaskCreatedEvent
   | SSETaskClaimedEvent
@@ -203,18 +264,24 @@ export type SSEEvent =
   | SSEAgentThinkingEvent
   | SSEErrorEvent
   | SSEConnectedEvent
-  | SSEManagerWorkingEvent;
+  | SSEManagerWorkingEvent
+  | SSEAgentToolUseEvent
+  | SSEAgentToolResultEvent
+  | SSEFileChangedEvent;
 
 // ─── Model / OpenRouter ───────────────────────────────────────────────────────
 
 export interface OpenRouterMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: string | null;
+  tool_calls?: any[];
+  tool_call_id?: string;
 }
 
 export interface OpenRouterCallResult {
-  content: string;
+  content: string | null;
   tokensUsed: number;
+  toolCalls?: any[];
 }
 
 export interface BuiltInAgentDefinition {
@@ -233,3 +300,4 @@ export interface FreeModel {
   provider: string;
   best_for: string;
 }
+

@@ -18,25 +18,78 @@ async function addColumnIfNotExists(
 export async function runMigrations(): Promise<void> {
   const pool = getPool();
 
-  // ── Sessions ────────────────────────────────────────────────────────────────
+  // ── Projects ───────────────────────────────────────────────────────────────
   await pool.execute(`
-    CREATE TABLE IF NOT EXISTS sessions (
+    CREATE TABLE IF NOT EXISTS projects (
       id VARCHAR(36) PRIMARY KEY,
-      goal TEXT NOT NULL,
-      status VARCHAR(20) NOT NULL DEFAULT 'pending',
-      final_report LONGTEXT,
-      total_tokens_used INT DEFAULT 0,
-      estimated_cost_usd DECIMAL(10,6) DEFAULT 0.0,
-      heartbeat_interval_minutes INT DEFAULT 15,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      repo_url VARCHAR(500),
+      repo_context LONGTEXT,
+      workspace_path VARCHAR(500),
       created_at BIGINT NOT NULL,
       updated_at BIGINT NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
+  await addColumnIfNotExists(pool, 'projects', 'description', 'TEXT');
+  await addColumnIfNotExists(pool, 'projects', 'repo_context', 'LONGTEXT');
+
+  // ── Sessions ────────────────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS sessions (
+      id VARCHAR(36) PRIMARY KEY,
+      project_id VARCHAR(36),
+      goal TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      workspace_dir VARCHAR(500),
+      final_report LONGTEXT,
+      total_tokens_used INT DEFAULT 0,
+      estimated_cost_usd DECIMAL(10,6) DEFAULT 0.0,
+      heartbeat_interval_minutes INT DEFAULT 15,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
   // Idempotent column additions for pre-existing sessions tables
+  await addColumnIfNotExists(pool, 'sessions', 'project_id', 'VARCHAR(36)');
+  await addColumnIfNotExists(pool, 'sessions', 'workspace_dir', 'VARCHAR(500)');
   await addColumnIfNotExists(pool, 'sessions', 'total_tokens_used', 'INT DEFAULT 0');
   await addColumnIfNotExists(pool, 'sessions', 'estimated_cost_usd', 'DECIMAL(10,6) DEFAULT 0.0');
   await addColumnIfNotExists(pool, 'sessions', 'heartbeat_interval_minutes', 'INT DEFAULT 15');
+
+  // ── Agent Steps ──────────────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS agent_steps (
+      id VARCHAR(36) PRIMARY KEY,
+      task_id VARCHAR(36) NOT NULL,
+      step_number INT NOT NULL,
+      tool_name VARCHAR(100) NOT NULL,
+      tool_args JSON,
+      tool_output LONGTEXT,
+      tokens_used INT DEFAULT 0,
+      duration_ms INT DEFAULT 0,
+      created_at BIGINT NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // ── File Changes ─────────────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS file_changes (
+      id VARCHAR(36) PRIMARY KEY,
+      session_id VARCHAR(36) NOT NULL,
+      task_id VARCHAR(36) NOT NULL,
+      file_path VARCHAR(500) NOT NULL,
+      change_type VARCHAR(20) NOT NULL,
+      diff_content LONGTEXT,
+      created_at BIGINT NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
 
   // ── Tasks ───────────────────────────────────────────────────────────────────
   await pool.execute(`

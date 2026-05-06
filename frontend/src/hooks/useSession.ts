@@ -10,18 +10,20 @@ export function useSession() {
   const { agentOverrides } = useModelStore();
   const { clearEvents } = useFeedStore();
 
-  const startSession = useCallback(async (goal: string): Promise<string | null> => {
+  const startSession = useCallback(async (goal: string, projectId?: string, workspaceDir?: string): Promise<string | null> => {
     setLoading(true);
     setError(null);
     clearEvents();
     try {
       const activeOverrides = Object.keys(agentOverrides).length > 0 ? agentOverrides : undefined;
-      const { sessionId } = await createSession(goal, activeOverrides);
+      const { sessionId } = await createSession(goal, activeOverrides, projectId, workspaceDir);
 
       const emptySession: Session = {
         id: sessionId,
+        project_id: projectId || null,
         goal,
-        status: 'pending',  // Start as pending — transitions to running when tasks are created
+        status: 'pending',
+        workspace_dir: workspaceDir || null,
         final_report: null,
         total_tokens_used: 0,
         estimated_cost_usd: 0,
@@ -45,8 +47,24 @@ export function useSession() {
     setError(null);
     clearEvents();
     try {
-      const session = await getSession(id);
+      const { session, comments, chatMessages } = await getSession(id);
+      
+      const { setCurrentSession, setComments, setChatMessages } = useSessionStore.getState();
+      
       setCurrentSession(session);
+      
+      // Group comments by task_id
+      const commentMap: Record<string, any[]> = {};
+      comments.forEach(c => {
+        if (!commentMap[c.task_id]) commentMap[c.task_id] = [];
+        commentMap[c.task_id].push(c);
+      });
+      
+      Object.entries(commentMap).forEach(([taskId, taskComments]) => {
+        setComments(taskId, taskComments);
+      });
+      
+      setChatMessages(chatMessages);
 
       // If the session is cancelled with no tasks, surface the error
       if (session.status === 'cancelled' && (!session.tasks || session.tasks.length === 0)) {

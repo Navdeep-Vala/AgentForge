@@ -12,6 +12,8 @@ import { startSession, cancelSession } from '../orchestrator/orchestrator';
 
 const createSessionSchema = z.object({
   goal: z.string().min(1, 'Goal is required').max(2000),
+  projectId: z.string().uuid().optional(),
+  workspaceDir: z.string().optional(),
   agentOverrides: z.record(z.string(), z.object({
     modelId: z.string().optional(),
     name: z.string().optional(),
@@ -30,12 +32,12 @@ export async function createSessionHandler(
       return;
     }
 
-    const { goal, agentOverrides } = parsed.data;
+    const { goal, projectId, workspaceDir, agentOverrides } = parsed.data;
     const sessionId = uuidv4();
 
     res.status(201).json({ sessionId, status: 'running' });
 
-    startSession(sessionId, goal, agentOverrides).catch((err) => {
+    startSession(sessionId, goal, projectId, workspaceDir, agentOverrides).catch((err) => {
       console.error('[Session] Background orchestration error:', err);
     });
   } catch (err) {
@@ -44,12 +46,13 @@ export async function createSessionHandler(
 }
 
 export async function listSessionsHandler(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const sessions = await getAllSessions();
+    const projectId = req.query.projectId as string | undefined;
+    const sessions = await getAllSessions(projectId);
     res.json({ sessions });
   } catch (err) {
     next(err);

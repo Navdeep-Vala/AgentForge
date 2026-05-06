@@ -8,8 +8,18 @@ export const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-export async function createSession(goal: string, agentOverrides?: Record<string, { modelId?: string; name?: string }>): Promise<{ sessionId: string; status: string }> {
-  const res = await api.post<{ sessionId: string; status: string }>('/sessions', { goal, agentOverrides });
+export async function createSession(
+  goal: string, 
+  agentOverrides?: Record<string, { modelId?: string; name?: string }>,
+  projectId?: string,
+  workspaceDir?: string
+): Promise<{ sessionId: string; status: string }> {
+  const res = await api.post<{ sessionId: string; status: string }>('/sessions', { 
+    goal, 
+    agentOverrides,
+    projectId,
+    workspaceDir
+  });
   return res.data;
 }
 
@@ -18,9 +28,9 @@ export async function listSessions(): Promise<SessionSummary[]> {
   return res.data.sessions;
 }
 
-export async function getSession(id: string): Promise<Session> {
-  const res = await api.get<{ session: Session }>(`/sessions/${id}`);
-  return res.data.session;
+export async function getSession(id: string): Promise<{ session: Session; comments: TaskComment[]; chatMessages: any[] }> {
+  const res = await api.get<{ session: Session; comments: TaskComment[]; chatMessages: any[] }>(`/sessions/${id}`);
+  return res.data;
 }
 
 export async function cancelSession(id: string): Promise<void> {

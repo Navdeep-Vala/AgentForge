@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Play, Square, Loader2 } from 'lucide-react';
-import { useSessionStore } from '../../store/sessionStore';
+import { useProjectStore } from '../../store/projectStore';
 
 interface GoalInputProps {
-  onStart: (goal: string) => void;
+  onStart: (goal: string, projectId?: string, workspaceDir?: string) => void;
   onCancel: () => void;
 }
 
 export function GoalInput({ onStart, onCancel }: GoalInputProps) {
   const [goal, setGoal] = useState('');
   const { currentSession, isLoading } = useSessionStore();
+  const { currentProject } = useProjectStore();
 
   const isRunning = currentSession?.status === 'running' || currentSession?.status === 'pending';
 
@@ -17,20 +18,30 @@ export function GoalInput({ onStart, onCancel }: GoalInputProps) {
     e.preventDefault();
     const trimmed = goal.trim();
     if (!trimmed || isLoading) return;
-    onStart(trimmed);
+    onStart(trimmed, currentProject?.id, currentProject?.workspace_path || undefined);
     setGoal('');
   };
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 shadow-sm">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <label className="text-sm font-medium text-gray-400">
-          What do you want to build or improve today?
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-gray-400">
+            What do you want to build or improve today?
+          </label>
+          {currentProject && (
+            <div className="flex items-center gap-1.5 text-[10px] bg-indigo-900/30 text-indigo-300 px-2 py-1 rounded border border-indigo-800/50">
+              <span className="font-bold uppercase opacity-70">Active Project:</span>
+              <span>{currentProject.name}</span>
+            </div>
+          )}
+        </div>
         <textarea
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
-          placeholder="e.g. Add JWT authentication to my Express API..."
+          placeholder={currentProject?.workspace_path 
+            ? `Ask something about ${currentProject.name} at ${currentProject.workspace_path}...` 
+            : "e.g. Add JWT authentication to my Express API..."}
           disabled={isRunning || isLoading}
           rows={3}
           className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-gray-100 placeholder-gray-600 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"

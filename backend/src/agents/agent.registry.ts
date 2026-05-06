@@ -75,20 +75,41 @@ export async function resolveAgent(
 
 import { getDynamicFallbacks } from '../services/free-model-pool.service';
 
+import { executeAgenticTask } from './agentic-loop';
+
 export async function executeAgentTask(
   agentType: string,
   taskDescription: string,
+  sessionId?: string,
+  taskId?: string,
+  workspaceDir?: string | null,
   signal?: AbortSignal,
   modelOverride?: string
 ): Promise<{ content: string; tokensUsed: number; modelUsed: string }> {
   const resolved = await resolveAgent(agentType);
   const fallbackAgent = BUILT_IN_AGENTS['researcher'];
-  const { systemPrompt, model: defaultModel } = resolved ?? {
+  const { systemPrompt, model: defaultModel, name: agentName } = resolved ?? {
     systemPrompt: fallbackAgent.systemPrompt,
     model: fallbackAgent.model,
+    name: 'Agent',
   };
 
   const primaryModel = modelOverride ?? defaultModel;
+
+  // Use Agentic Loop if workspace is provided
+  if (workspaceDir && sessionId && taskId) {
+    return executeAgenticTask(
+      sessionId,
+      taskId,
+      agentType,
+      agentName,
+      taskDescription,
+      workspaceDir,
+      signal as AbortSignal,
+      primaryModel
+    );
+  }
+
   const triedModels: string[] = [];
   let lastError: Error = new Error('All models failed for task execution');
 
@@ -106,7 +127,7 @@ export async function executeAgentTask(
         4096,
         signal
       );
-      return { ...result, modelUsed: primaryModel };
+      return { ...result, modelUsed: primaryModel, content: result.content || '' };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
@@ -133,7 +154,7 @@ export async function executeAgentTask(
         4096,
         signal
       );
-      return { ...result, modelUsed: model };
+      return { ...result, modelUsed: model, content: result.content || '' };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');

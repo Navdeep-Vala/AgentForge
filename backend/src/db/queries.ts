@@ -9,7 +9,49 @@ import {
   CustomAgent,
   SessionStatus,
   TaskStatus,
+  Project,
+  AgentStep,
+  FileChange,
 } from '../types';
+
+// ─── Projects ─────────────────────────────────────────────────────────────────
+
+export async function createProject(project: Project): Promise<void> {
+  const pool = getPool();
+  await pool.execute(
+    `INSERT INTO projects (id, name, description, repo_url, repo_context, workspace_path, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [project.id, project.name, project.description, project.repo_url, project.repo_context, project.workspace_path, project.created_at, project.updated_at]
+  );
+}
+
+export async function getProjectById(id: string): Promise<Project | null> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>('SELECT * FROM projects WHERE id = ?', [id]);
+  return rows.length > 0 ? (rows[0] as Project) : null;
+}
+
+export async function getAllProjects(): Promise<Project[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>('SELECT * FROM projects ORDER BY updated_at DESC');
+  return rows as Project[];
+}
+
+export async function updateProject(id: string, updates: Partial<Project>): Promise<void> {
+  const pool = getPool();
+  const fields = Object.keys(updates)
+    .filter(k => k !== 'id')
+    .map((k) => `${k} = ?`)
+    .join(', ');
+  const values = Object.values(updates).filter((_, i) => Object.keys(updates)[i] !== 'id');
+  values.push(id);
+  await pool.execute(`UPDATE projects SET ${fields} WHERE id = ?`, values);
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  const pool = getPool();
+  await pool.execute('DELETE FROM projects WHERE id = ?', [id]);
+}
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
@@ -17,13 +59,15 @@ export async function createSession(session: Session): Promise<void> {
   const pool = getPool();
   await pool.execute(
     `INSERT INTO sessions
-       (id, goal, status, final_report, total_tokens_used, estimated_cost_usd,
+       (id, project_id, goal, status, workspace_dir, final_report, total_tokens_used, estimated_cost_usd,
         heartbeat_interval_minutes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       session.id,
+      session.project_id,
       session.goal,
       session.status,
+      session.workspace_dir,
       session.final_report,
       session.total_tokens_used,
       session.estimated_cost_usd,
@@ -40,15 +84,26 @@ export async function getSessionById(id: string): Promise<Session | null> {
   return rows.length > 0 ? (rows[0] as Session) : null;
 }
 
-export async function getAllSessions(): Promise<Array<Session & { taskCount: number }>> {
+export async function getAllSessions(projectId?: string): Promise<Array<Session & { taskCount: number }>> {
   const pool = getPool();
-  const [rows] = await pool.execute<RowDataPacket[]>(`
+  let query = `
     SELECT s.*, COUNT(t.id) AS taskCount
     FROM sessions s
     LEFT JOIN tasks t ON t.session_id = s.id
+  `;
+  const params: any[] = [];
+
+  if (projectId) {
+    query += ' WHERE s.project_id = ?';
+    params.push(projectId);
+  }
+
+  query += `
     GROUP BY s.id
     ORDER BY s.created_at DESC
-  `);
+  `;
+
+  const [rows] = await pool.execute<RowDataPacket[]>(query, params);
   return rows as Array<Session & { taskCount: number }>;
 }
 
@@ -421,4 +476,62 @@ export async function updateCustomAgent(
 export async function deleteCustomAgent(id: string): Promise<void> {
   const pool = getPool();
   await pool.execute('DELETE FROM custom_agents WHERE id = ?', [id]);
+}
+// ─── Agent Steps ──────────────────────────────────────────────────────────────
+
+export async function createAgentStep(step: AgentStep): Promise<void> {
+  const pool = getPool();
+  await pool.execute(
+    `INSERT INTO agent_steps (id, task_id, step_number, tool_name, tool_args, tool_output, tokens_used, duration_ms, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      step.id,
+      step.task_id,
+      step.step_number,
+      step.tool_name,
+      JSON.stringify(step.tool_args),
+      step.tool_output,
+      step.tokens_used,
+      step.duration_ms,
+      step.created_at,
+    ]
+  );
+}
+
+export async function getStepsByTaskId(taskId: string): Promise<AgentStep[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT * FROM agent_steps WHERE task_id = ? ORDER BY step_number ASC',
+    [taskId]
+  );
+  return rows as AgentStep[];
+}
+
+// ─── File Changes ─────────────────────────────────────────────────────────────
+
+export async function createFileChange(change: FileChange): Promise<void> {
+  const pool = getPool();
+  await pool.execute(
+    `INSERT INTO file_changes (id, session_id, task_id, file_path, change_type, diff_content, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [change.id, change.session_id, change.task_id, change.file_path, change.change_type, change.diff_content, change.created_at]
+  );
+}
+
+export async function getFileChangesBySessionId(sessionId: string): Promise<FileChange[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT * FROM file_changes WHERE session_id = ? ORDER BY created_at DESC',
+    [sessionId]
+  );
+  return rows as FileChange[];
+}
+
+export async function getFileChangesByTaskId(taskId: string): Promise<FileChange[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT * FROM file_changes WHERE task_id = ? ORDER BY created_at DESC',
+    [taskId]
+  );
+  return rows as FileChange[];
 }

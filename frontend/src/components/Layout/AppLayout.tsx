@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, History, Users, ChevronDown, X } from 'lucide-react';
+import { Bot, History, Users, ChevronDown, X, Folder } from 'lucide-react';
 import { useSession } from '../../hooks/useSession';
-import { listSessions } from '../../api/client';
+import { api, listSessions } from '../../api/client';
 import { SessionSummary } from '../../types';
+import { ProjectSelector } from '../ProjectSelector/ProjectSelector';
+import { useProjectStore } from '../../store/projectStore';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -13,13 +15,16 @@ export function AppLayout({ children, onManageAgents }: AppLayoutProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const { loadSession } = useSession();
+  const { currentProject } = useProjectStore();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (historyOpen) {
-      listSessions().then(setSessions).catch(() => undefined);
+      // Filter by current project if selected
+      const url = currentProject ? `/sessions?projectId=${currentProject.id}` : '/sessions';
+      api.get<{ sessions: SessionSummary[] }>(url).then(res => setSessions(res.data.sessions)).catch(() => undefined);
     }
-  }, [historyOpen]);
+  }, [historyOpen, currentProject]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -39,9 +44,15 @@ export function AppLayout({ children, onManageAgents }: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
       <header className="border-b border-gray-800 bg-gray-900 px-6 py-3 flex items-center justify-between sticky top-0 z-40">
-        <div className="flex items-center gap-2">
-          <Bot className="text-indigo-400" size={22} />
-          <span className="font-bold text-lg tracking-tight">AgentForge</span>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <Bot className="text-indigo-400" size={22} />
+            <span className="font-bold text-lg tracking-tight">AgentForge</span>
+          </div>
+          
+          <div className="h-6 w-[1px] bg-gray-800" />
+          
+          <ProjectSelector />
         </div>
 
         <nav className="flex items-center gap-2">

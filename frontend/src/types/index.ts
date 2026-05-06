@@ -2,10 +2,21 @@ export type SessionStatus = 'pending' | 'running' | 'completed' | 'cancelled';
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled';
 export type CommentType = 'insight' | 'review' | 'refute' | 'praise' | 'question';
 
+export interface Project {
+  id: string;
+  name: string;
+  repo_url: string | null;
+  workspace_path: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface Session {
   id: string;
+  project_id: string | null;
   goal: string;
   status: SessionStatus;
+  workspace_dir: string | null;
   final_report: string | null;
   total_tokens_used: number;
   estimated_cost_usd: number;
@@ -17,6 +28,7 @@ export interface Session {
 
 export interface SessionSummary {
   id: string;
+  project_id: string | null;
   goal: string;
   status: SessionStatus;
   taskCount: number;
@@ -126,6 +138,29 @@ export type SSEMessage =
   | { type: 'session_status_changed'; status: SessionStatus }
   | { type: 'agent_thinking'; agentType: string; agentName: string; message: string }
   | { type: 'manager_working'; message: string }
+  | {
+      type: 'agent_tool_use';
+      taskId: string;
+      agentType: string;
+      toolName: string;
+      toolArgs: any;
+      iteration: number;
+    }
+  | {
+      type: 'agent_tool_result';
+      taskId: string;
+      agentType: string;
+      toolName: string;
+      output: string;
+      success: boolean;
+    }
+  | {
+      type: 'file_changed';
+      sessionId: string;
+      taskId: string;
+      filePath: string;
+      changeType: 'created' | 'modified' | 'deleted';
+    }
   | { type: 'error'; taskId: string; message: string };
 
 // ─── Model selector ───────────────────────────────────────────────────────────

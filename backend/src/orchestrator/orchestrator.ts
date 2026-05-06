@@ -38,7 +38,13 @@ function dispatchSpawnedTask(sessionId: string, signal: AbortSignal, agentOverri
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
-export async function startSession(sessionId: string, goal: string, agentOverrides?: Record<string, AgentOverride>): Promise<void> {
+export async function startSession(
+  sessionId: string,
+  goal: string,
+  projectId?: string,
+  workspaceDir?: string,
+  agentOverrides?: Record<string, AgentOverride>
+): Promise<void> {
   const controller = new AbortController();
   abortControllers.set(sessionId, controller);
   sessionGoals.set(sessionId, goal);
@@ -47,8 +53,10 @@ export async function startSession(sessionId: string, goal: string, agentOverrid
   const now = Date.now();
   const session: Session = {
     id: sessionId,
+    project_id: projectId || null,
     goal,
     status: 'pending',
+    workspace_dir: workspaceDir || null,
     final_report: null,
     total_tokens_used: 0,
     estimated_cost_usd: 0,
@@ -147,7 +155,7 @@ export async function startSession(sessionId: string, goal: string, agentOverrid
     );
 
     // Run all initial tasks in parallel
-    const taskPromises = taskRecords.map((task) => runTask(task, sessionId, signal, agentOverrides));
+    const taskPromises = taskRecords.map((task) => runTask(task, sessionId, workspaceDir, signal, agentOverrides));
     await Promise.allSettled(taskPromises);
 
     if (signal.aborted) {
@@ -217,7 +225,13 @@ export async function startSession(sessionId: string, goal: string, agentOverrid
 
 // ─── Run a single task ────────────────────────────────────────────────────────
 
-async function runTask(task: Task, sessionId: string, signal: AbortSignal, agentOverrides?: Record<string, AgentOverride>): Promise<void> {
+async function runTask(
+  task: Task,
+  sessionId: string,
+  workspaceDir: string | undefined | null,
+  signal: AbortSignal,
+  agentOverrides?: Record<string, AgentOverride>
+): Promise<void> {
   const startedAt = Date.now();
   await updateTaskStatus(task.id, 'in_progress', startedAt);
 
@@ -230,7 +244,15 @@ async function runTask(task: Task, sessionId: string, signal: AbortSignal, agent
   });
 
   try {
-    const result = await executeAgentTask(task.agent_type, task.description, signal, agentOverrides?.[task.agent_type]?.modelId);
+    const result = await executeAgentTask(
+      task.agent_type,
+      task.description,
+      sessionId,
+      task.id,
+      workspaceDir,
+      signal,
+      agentOverrides?.[task.agent_type]?.modelId
+    );
     const completedAt = Date.now();
 
     await updateTaskComplete(task.id, 'done', result.content, result.tokensUsed, result.modelUsed, completedAt);
