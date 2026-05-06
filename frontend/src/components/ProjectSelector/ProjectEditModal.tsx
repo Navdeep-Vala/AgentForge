@@ -47,11 +47,11 @@ export function ProjectEditModal({ project, onClose }: Props) {
 
   const handleSync = async () => {
     if (!repoUrl.trim()) return;
-    await updateProject(project.id, { repo_url: repoUrl.trim(), updated_at: Date.now() });
     setSyncing(true);
     setSyncError(null);
     setSyncResult(null);
     try {
+      await updateProject(project.id, { repo_url: repoUrl.trim(), updated_at: Date.now() });
       const { size } = await syncProjectRepo(project.id);
       setSyncResult(`Synced · ${Math.round(size / 1024)}KB`);
       await fetchProjects();
