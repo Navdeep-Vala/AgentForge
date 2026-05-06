@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Play, Square, Loader2 } from 'lucide-react';
 import { useProjectStore } from '../../store/projectStore';
+import { useSessionStore } from '../../store/sessionStore';
 
 interface GoalInputProps {
   onStart: (goal: string, projectId?: string, workspaceDir?: string) => void;

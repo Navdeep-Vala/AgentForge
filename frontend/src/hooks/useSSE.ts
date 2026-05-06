@@ -58,7 +58,7 @@ export function useSSE(sessionId: string | null): void {
         if (active) {
           reconnectTimeout.current = setTimeout(() => {
             getSession(sessionId)
-              .then((session) => {
+              .then(({ session }) => {
                 if (session.status === 'running' || session.status === 'pending') {
                   connect();
                 } else {

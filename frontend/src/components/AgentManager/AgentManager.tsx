@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Bot, Save, AlertCircle } from 'lucide-react';
+import { X, Plus, Trash2, Bot, Save, AlertCircle, Zap } from 'lucide-react';
 import { useAgentStore } from '../../store/agentStore';
 import { AgentDefinition, FREE_MODELS } from '../../types';
 
@@ -28,7 +28,7 @@ const emptyForm = {
 };
 
 export function AgentManager({ onClose }: AgentManagerProps) {
-  const { agents, fetchAgents, addAgent, removeAgent } = useAgentStore();
+  const { agents, fetchAgents, addAgent, editAgent, removeAgent } = useAgentStore();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);

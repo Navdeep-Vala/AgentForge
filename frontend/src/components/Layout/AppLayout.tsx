@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, History, Users, ChevronDown, X, Folder } from 'lucide-react';
+import { Bot, History, Users, ChevronDown, X } from 'lucide-react';
 import { useSession } from '../../hooks/useSession';
-import { api, listSessions } from '../../api/client';
+import { api } from '../../api/client';
 import { SessionSummary } from '../../types';
 import { ProjectSelector } from '../ProjectSelector/ProjectSelector';
 import { useProjectStore } from '../../store/projectStore';

@@ -176,7 +176,7 @@ When all tasks settle --> Jarvis writes the final synthesis report
 Framework:     React 18 + TypeScript 5
 Build Tool:    Vite 5
 Styling:       Tailwind CSS 3.4
-State:         Zustand 4
+State:         Redux Toolkit 2 + React Redux 9
 HTTP Client:   Axios 1.7
 Real-time:     Native EventSource API (SSE)
 Icons:         Lucide React
@@ -291,9 +291,15 @@ frontend/
 │   │   ├── useSSE.ts                 # SSE connection + event dispatcher
 │   │   └── useSession.ts             # Session CRUD + state
 │   ├── store/
-│   │   ├── sessionStore.ts           # Zustand: session, tasks, chat messages
-│   │   ├── agentStore.ts             # Zustand: agent config + custom agents
-│   │   └── modelStore.ts             # Zustand: selected models + BYOK key status
+│   │   ├── store.ts                  # Redux store configuration
+│   │   ├── hooks.ts                  # Typed Redux hooks
+│   │   ├── sessionStore.ts           # Redux slice: session, tasks, comments, chat messages
+│   │   ├── agentStore.ts             # Redux slice: agent config + custom agents
+│   │   ├── projectStore.ts           # Redux slice: projects + current project
+│   │   ├── modelStore.ts             # Redux slice: model list + per-agent overrides
+│   │   ├── themeStore.ts             # Redux slice: theme preference
+│   │   ├── feedStore.ts              # Redux slice: live feed events
+│   │   └── persistence.ts            # localStorage helpers for persisted UI state
 │   ├── api/
 │   │   └── client.ts                 # Axios instance + typed API calls
 │   ├── types/
@@ -1195,7 +1201,7 @@ VITE_API_BASE_URL=http://localhost:3001
 
 11. **No ORM** — Raw `mysql2` queries only via the async connection pool. All queries are typed functions in `db/queries.ts`. Use `pool.execute()` for parameterized queries (auto-prepared statements). Use `RowDataPacket` from `mysql2` for typed row results.
 
-12. **Zustand stores** — Three: `sessionStore` (session, tasks, comments, chat messages, SSE state), `agentStore` (built-in + custom agents), `modelStore` (model list + BYOK provider status — never raw keys in frontend state).
+12. **Redux Toolkit store** — Use Redux Toolkit slices with React Redux hooks. Core slices: `sessionStore` (session, tasks, comments, chat messages, SSE state), `agentStore` (built-in + custom agents), `projectStore` (projects + current project), `modelStore` (model list + per-agent overrides), `themeStore` (theme preference), and `feedStore` (live event stream). Persist only non-sensitive UI preferences such as theme and model overrides in localStorage; never store raw provider API keys in frontend state.
 
 ---
 
@@ -1247,7 +1253,8 @@ VITE_API_BASE_URL=http://localhost:3001
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "axios": "^1.7.0",
-    "zustand": "^4.5.0",
+    "@reduxjs/toolkit": "^2.11.2",
+    "react-redux": "^9.2.0",
     "react-markdown": "^9.0.0",
     "remark-gfm": "^4.0.0",
     "react-syntax-highlighter": "^15.5.0",

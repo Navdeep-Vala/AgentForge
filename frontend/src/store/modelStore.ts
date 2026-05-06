@@ -1,11 +1,9 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { useCallback, useMemo } from 'react';
 import { FreeModel, listModels } from '../api/client';
-
-interface AgentOverride {
-  modelId?: string;
-  name?: string;
-}
+import { useAppDispatch, useAppSelector } from './hooks';
+import { AgentOverride, loadPersistedAgentOverrides, persistAgentOverrides } from './persistence';
+import type { RootState } from './store';
 
 interface ModelState {
   freeModels: FreeModel[];
@@ -17,49 +15,109 @@ interface ModelState {
   clearAgentOverride: (agentType: string) => void;
 }
 
-export const useModelStore = create<ModelState>()(
-  persist(
-    (set) => ({
-      freeModels: [],
-      agentOverrides: {},
-      isLoading: false,
+const initialState: Omit<
+  ModelState,
+  'fetchModels' | 'setAgentModel' | 'setAgentName' | 'clearAgentOverride'
+> = {
+  freeModels: [],
+  agentOverrides: loadPersistedAgentOverrides(),
+  isLoading: false,
+};
 
-      fetchModels: async () => {
-        set({ isLoading: true });
-        try {
-          const { free } = await listModels();
-          set({ freeModels: free, isLoading: false });
-        } catch {
-          set({ isLoading: false });
-        }
-      },
+export const fetchModels = createAsyncThunk('models/fetchModels', async () => {
+  const { free } = await listModels();
+  return free;
+});
 
-      setAgentModel: (agentType, modelId) =>
-        set((state) => ({
-          agentOverrides: {
-            ...state.agentOverrides,
-            [agentType]: { ...state.agentOverrides[agentType], modelId },
-          },
-        })),
+const modelSlice = createSlice({
+  name: 'models',
+  initialState,
+  reducers: {
+    setAgentModel(state, action: PayloadAction<{ agentType: string; modelId: string }>) {
+      const { agentType, modelId } = action.payload;
+      state.agentOverrides = {
+        ...state.agentOverrides,
+        [agentType]: { ...state.agentOverrides[agentType], modelId },
+      };
+      persistAgentOverrides(state.agentOverrides);
+    },
+    setAgentName(state, action: PayloadAction<{ agentType: string; name: string }>) {
+      const { agentType, name } = action.payload;
+      state.agentOverrides = {
+        ...state.agentOverrides,
+        [agentType]: { ...state.agentOverrides[agentType], name },
+      };
+      persistAgentOverrides(state.agentOverrides);
+    },
+    clearAgentOverride(state, action: PayloadAction<string>) {
+      const next = { ...state.agentOverrides };
+      delete next[action.payload];
+      state.agentOverrides = next;
+      persistAgentOverrides(state.agentOverrides);
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchModels.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(fetchModels.fulfilled, (state, action) => {
+        state.freeModels = action.payload;
+        state.isLoading = false;
+      })
+      .addCase(fetchModels.rejected, (state) => {
+        state.isLoading = false;
+      });
+  },
+});
 
-      setAgentName: (agentType, name) =>
-        set((state) => ({
-          agentOverrides: {
-            ...state.agentOverrides,
-            [agentType]: { ...state.agentOverrides[agentType], name },
-          },
-        })),
+export const { setAgentModel, setAgentName, clearAgentOverride } = modelSlice.actions;
 
-      clearAgentOverride: (agentType) =>
-        set((state) => {
-          const next = { ...state.agentOverrides };
-          delete next[agentType];
-          return { agentOverrides: next };
-        }),
+const selectModelState = (state: RootState) => state.models;
+
+export function useModelStore(): ModelState {
+  const dispatch = useAppDispatch();
+  const state = useAppSelector(selectModelState);
+
+  const boundFetchModels = useCallback(
+    async () => void (await dispatch(fetchModels())),
+    [dispatch]
+  );
+  const boundSetAgentModel = useCallback(
+    (agentType: string, modelId: string) => {
+      dispatch(setAgentModel({ agentType, modelId }));
+    },
+    [dispatch]
+  );
+  const boundSetAgentName = useCallback(
+    (agentType: string, name: string) => {
+      dispatch(setAgentName({ agentType, name }));
+    },
+    [dispatch]
+  );
+  const boundClearAgentOverride = useCallback(
+    (agentType: string) => {
+      dispatch(clearAgentOverride(agentType));
+    },
+    [dispatch]
+  );
+
+  return useMemo(
+    () => ({
+      ...state,
+      fetchModels: boundFetchModels,
+      setAgentModel: boundSetAgentModel,
+      setAgentName: boundSetAgentName,
+      clearAgentOverride: boundClearAgentOverride,
     }),
-    {
-      name: 'agentforge-model-overrides-v2',
-      partialize: (state) => ({ agentOverrides: state.agentOverrides }),
-    }
-  )
-);
+    [
+      state,
+      boundFetchModels,
+      boundSetAgentModel,
+      boundSetAgentName,
+      boundClearAgentOverride,
+    ]
+  );
+}
+
+export default modelSlice.reducer;

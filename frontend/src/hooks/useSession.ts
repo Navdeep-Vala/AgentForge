@@ -6,7 +6,14 @@ import { useFeedStore } from '../store/feedStore';
 import { Session } from '../types';
 
 export function useSession() {
-  const { setCurrentSession, setLoading, setError, reset } = useSessionStore();
+  const {
+    setCurrentSession,
+    setLoading,
+    setError,
+    reset,
+    setComments,
+    setChatMessages,
+  } = useSessionStore();
   const { agentOverrides } = useModelStore();
   const { clearEvents } = useFeedStore();
 
@@ -48,11 +55,9 @@ export function useSession() {
     clearEvents();
     try {
       const { session, comments, chatMessages } = await getSession(id);
-      
-      const { setCurrentSession, setComments, setChatMessages } = useSessionStore.getState();
-      
+
       setCurrentSession(session);
-      
+
       // Group comments by task_id
       const commentMap: Record<string, any[]> = {};
       comments.forEach(c => {
@@ -75,7 +80,7 @@ export function useSession() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [clearEvents, setChatMessages, setComments, setCurrentSession, setError, setLoading]);
 
   const stopSession = useCallback(async (id: string): Promise<void> => {
     try {
@@ -88,7 +93,7 @@ export function useSession() {
   const clearSession = useCallback(() => {
     reset();
     clearEvents();
-  }, []);
+  }, [clearEvents, reset]);
 
   return { startSession, loadSession, stopSession, clearSession };
 }
