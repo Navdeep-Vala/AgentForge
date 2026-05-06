@@ -8,5 +8,6 @@ router.post('/', projectController.createProject);
 router.get('/:id', projectController.getProject);
 router.put('/:id', projectController.updateProject);
 router.delete('/:id', projectController.deleteProject);
+router.post('/:id/sync', projectController.syncProjectRepo);
 
 export default router;
