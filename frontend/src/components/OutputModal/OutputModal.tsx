@@ -36,13 +36,13 @@ export function OutputModal({ task, onClose }: OutputModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
       <div className="bg-app-surface border border-app-border rounded-xl w-full max-w-3xl max-h-[88vh] flex flex-col shadow-card-md">
         {/* Header */}
         <div className="flex items-start justify-between p-4 border-b border-app-border">
           <div className="flex items-center gap-3">
             <div
-              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0"
               style={{ backgroundColor: color }}
             >
               {task.agent_name.slice(0, 2).toUpperCase()}
@@ -52,7 +52,7 @@ export function OutputModal({ task, onClose }: OutputModalProps) {
               <h2 className="text-sm font-semibold text-app-text leading-snug">{task.title}</h2>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handleCopy}
               className="flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] rounded bg-app-col text-app-sub hover:text-app-text border border-app-border transition-colors"

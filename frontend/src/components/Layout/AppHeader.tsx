@@ -61,11 +61,11 @@ export function AppHeader({ onManageAgents, onSelectModels, onLoadSession, onSta
   };
 
   return (
-    <header className="h-auto flex-shrink-0 flex flex-col border-b bg-app-surface border-app-border z-30">
+    <header className="h-auto shrink-0 flex flex-col border-b bg-app-surface border-app-border z-30">
       {/* Main bar */}
       <div className="h-11 flex items-center px-4 gap-4">
         {/* Logo */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="grid grid-cols-2 gap-[3px] w-[14px]">
             {[0,1,2,3].map(i => <div key={i} className="w-[5px] h-[5px] rounded-[1px] bg-app-text opacity-90" />)}
           </div>
@@ -88,27 +88,27 @@ export function AppHeader({ onManageAgents, onSelectModels, onLoadSession, onSta
             onKeyDown={e => e.key === 'Enter' && handleStart()}
             placeholder={isRunning ? currentSession?.goal ?? 'Running…' : 'Describe your goal…'}
             disabled={isRunning}
-            className={`flex-1 h-7 px-3 rounded text-[12px] bg-app-col border text-app-text placeholder:text-app-muted focus:outline-none transition-colors disabled:opacity-60 ${goalError ? 'border-red-500/60 focus:border-red-500' : 'border-app-border focus:border-app-sub'}`}
+            className={`flex-1 h-7 px-3 rounded text-[12px] bg-app-col border text-app-text placeholder:text-app-muted focus:outline-hidden transition-colors disabled:opacity-60 ${goalError ? 'border-red-500/60 focus:border-red-500' : 'border-app-border focus:border-app-sub'}`}
           />
           {isRunning ? (
             <div className="flex items-center gap-2">
               <StatusPill session={currentSession} tasks={tasks} />
-              <button onClick={onCancel} className="px-2.5 h-7 rounded text-[11px] font-medium bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-colors flex-shrink-0">
+              <button onClick={onCancel} className="px-2.5 h-7 rounded text-[11px] font-medium bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0">
                 Cancel
               </button>
             </div>
           ) : isFailed ? (
             <div className="flex items-center gap-2">
-              <button onClick={handleRetry} className="px-3 h-7 rounded text-[11px] font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 transition-colors flex-shrink-0 flex items-center gap-1.5">
+              <button onClick={handleRetry} className="px-3 h-7 rounded text-[11px] font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 transition-colors shrink-0 flex items-center gap-1.5">
                 <RotateCcw size={11} />
                 Retry
               </button>
-              <button onClick={handleStart} disabled={!goal.trim()} className="px-3 h-7 rounded text-[11px] font-semibold bg-app-text text-app-surface hover:opacity-80 disabled:opacity-30 transition-opacity flex-shrink-0">
+              <button onClick={handleStart} disabled={!goal.trim()} className="px-3 h-7 rounded text-[11px] font-semibold bg-app-text text-app-surface hover:opacity-80 disabled:opacity-30 transition-opacity shrink-0">
                 New →
               </button>
             </div>
           ) : (
-            <button onClick={handleStart} disabled={!goal.trim()} className="px-3 h-7 rounded text-[11px] font-semibold bg-app-text text-app-surface hover:opacity-80 disabled:opacity-30 transition-opacity flex-shrink-0">
+            <button onClick={handleStart} disabled={!goal.trim()} className="px-3 h-7 rounded text-[11px] font-semibold bg-app-text text-app-surface hover:opacity-80 disabled:opacity-30 transition-opacity shrink-0">
               Run →
             </button>
           )}
@@ -117,13 +117,13 @@ export function AppHeader({ onManageAgents, onSelectModels, onLoadSession, onSta
         </div>
 
         {/* Stats */}
-        <div className="flex items-center gap-5 flex-shrink-0">
+        <div className="flex items-center gap-5 shrink-0">
           <Stat label="AGENTS ACTIVE" value={active} icon={<Zap size={10} />} accent="text-amber-500" />
           <Stat label="TASKS DONE"    value={done}   icon={<CheckSquare size={10} />} accent="text-emerald-500" />
         </div>
 
         {/* Controls */}
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           {/* History */}
           <div className="relative">
             <Btn onClick={() => setHistoryOpen(o => !o)}>
@@ -187,11 +187,11 @@ export function AppHeader({ onManageAgents, onSelectModels, onLoadSession, onSta
       {/* Error banner with retry */}
       {isFailed && error && (
         <div className="flex items-center gap-3 px-4 py-2 bg-red-500/5 border-t border-red-500/20">
-          <AlertTriangle size={14} className="text-red-500 flex-shrink-0" />
+          <AlertTriangle size={14} className="text-red-500 shrink-0" />
           <p className="text-[11px] text-red-400 flex-1 truncate">{error}</p>
           <button
             onClick={handleRetry}
-            className="flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors flex-shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors shrink-0"
           >
             <RotateCcw size={10} />
             Retry with same goal

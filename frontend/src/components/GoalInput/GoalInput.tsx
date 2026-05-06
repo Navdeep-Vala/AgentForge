@@ -24,7 +24,7 @@ export function GoalInput({ onStart, onCancel }: GoalInputProps) {
   };
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 shadow-sm">
+    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 shadow-xs">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-gray-400">
@@ -45,7 +45,7 @@ export function GoalInput({ onStart, onCancel }: GoalInputProps) {
             : "e.g. Add JWT authentication to my Express API..."}
           disabled={isRunning || isLoading}
           rows={3}
-          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-gray-100 placeholder-gray-600 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-gray-100 placeholder-gray-600 text-sm resize-none focus:outline-hidden focus:ring-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmit(e);
           }}

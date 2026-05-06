@@ -52,13 +52,13 @@ export function ModelSelectorModal({ onClose }: Props) {
   const allAgents = [...BUILT_IN_AGENTS, ...activeCustomAgents];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs" onClick={onClose}>
       <div
         className="w-[640px] max-h-[85vh] flex flex-col bg-app-surface border border-app-border rounded-xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-app-border flex-shrink-0 bg-app-surface">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-app-border shrink-0 bg-app-surface">
           <div className="flex items-center gap-2">
             <Cpu size={16} className="text-app-sub" />
             <span className="text-sm font-semibold text-app-text">Agent & Model Configuration</span>
@@ -81,7 +81,7 @@ export function ModelSelectorModal({ onClose }: Props) {
         </div>
 
         {/* Description */}
-        <div className="px-5 py-3 bg-app-col/30 border-b border-app-border flex-shrink-0">
+        <div className="px-5 py-3 bg-app-col/30 border-b border-app-border shrink-0">
           <p className="text-[11px] text-app-muted leading-relaxed">
             Customize agent names and select which free model each agent uses. Overrides are session-specific and apply to the next session you start.
           </p>
@@ -90,7 +90,7 @@ export function ModelSelectorModal({ onClose }: Props) {
         {/* Agent rows */}
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-app-surface z-10 shadow-sm">
+            <thead className="sticky top-0 bg-app-surface z-10 shadow-xs">
               <tr className="border-b border-app-border">
                 <th className="px-5 py-2.5 text-[10px] font-bold text-app-muted uppercase tracking-wider w-40">Agent</th>
                 <th className="px-5 py-2.5 text-[10px] font-bold text-app-muted uppercase tracking-wider">Model Selection</th>
@@ -111,7 +111,7 @@ export function ModelSelectorModal({ onClose }: Props) {
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <div
-                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            className="w-2 h-2 rounded-full shrink-0"
                             style={{ backgroundColor: agent.color }}
                           />
                           {editingType === agent.type ? (
@@ -122,7 +122,7 @@ export function ModelSelectorModal({ onClose }: Props) {
                                 onChange={(e) => setTempName(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleSaveName(agent.type)}
                                 onBlur={() => handleSaveName(agent.type)}
-                                className="w-full h-6 px-1.5 rounded text-[12px] bg-app-bg border border-app-sub text-app-text focus:outline-none"
+                                className="w-full h-6 px-1.5 rounded text-[12px] bg-app-bg border border-app-sub text-app-text focus:outline-hidden"
                               />
                               <button onClick={() => handleSaveName(agent.type)} className="text-app-sub">
                                 <Check size={14} />
@@ -157,7 +157,7 @@ export function ModelSelectorModal({ onClose }: Props) {
                           <select
                             value={selectedModel}
                             onChange={(e) => setAgentModel(agent.type, e.target.value)}
-                            className="w-full h-8 px-3 pr-8 rounded text-[11px] bg-app-col border border-app-border text-app-text focus:outline-none focus:border-app-sub appearance-none cursor-pointer hover:border-app-muted transition-colors"
+                            className="w-full h-8 px-3 pr-8 rounded text-[11px] bg-app-col border border-app-border text-app-text focus:outline-hidden focus:border-app-sub appearance-none cursor-pointer hover:border-app-muted transition-colors"
                           >
                             {freeModels.length === 0 ? (
                               <option value={agent.defaultModel}>{agent.defaultModel}</option>
@@ -210,7 +210,7 @@ export function ModelSelectorModal({ onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-app-border flex items-center justify-between flex-shrink-0 bg-app-surface">
+        <div className="px-5 py-4 border-t border-app-border flex items-center justify-between shrink-0 bg-app-surface">
           <a
             href="https://openrouter.ai/models?q=:free"
             target="_blank"

@@ -1,51 +1,63 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@theme inline {
+  --color-app-bg: var(--app-bg);
+  --color-app-surface: var(--app-surface);
+  --color-app-col: var(--app-col);
+  --color-app-border: var(--app-border);
+  --color-app-text: var(--app-text);
+  --color-app-sub: var(--app-sub);
+  --color-app-muted: var(--app-muted);
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --shadow-card: var(--app-shadow-card);
+  --shadow-card-md: var(--app-shadow-card-md);
+}
 
 /* ── Theme tokens ─────────────────────────────────────── */
 :root {
-  --app-bg:      #f5f5f5;
+  color-scheme: light;
+  --app-bg: #f5f5f5;
   --app-surface: #ffffff;
-  --app-col:     #eeeeee;
-  --app-border:  #e2e2e2;
-  --app-text:    #111111;
-  --app-sub:     #666666;
-  --app-muted:   #aaaaaa;
-  --shadow-card:    0 1px 2px rgba(0,0,0,.06), 0 1px 4px rgba(0,0,0,.04);
-  --shadow-card-md: 0 4px 8px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.04);
+  --app-col: #eeeeee;
+  --app-border: #e2e2e2;
+  --app-text: #111111;
+  --app-sub: #666666;
+  --app-muted: #aaaaaa;
+  --app-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --app-shadow-card-md: 0 4px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .dark {
-  --app-bg:      #111111;
+  color-scheme: dark;
+  --app-bg: #111111;
   --app-surface: #1a1a1a;
-  --app-col:     #161616;
-  --app-border:  #2a2a2a;
-  --app-text:    #f0f0f0;
-  --app-sub:     #888888;
-  --app-muted:   #444444;
-  --shadow-card:    0 1px 2px rgba(0,0,0,.5), 0 1px 4px rgba(0,0,0,.4);
-  --shadow-card-md: 0 4px 8px rgba(0,0,0,.6), 0 1px 3px rgba(0,0,0,.5);
+  --app-col: #161616;
+  --app-border: #2a2a2a;
+  --app-text: #f0f0f0;
+  --app-sub: #888888;
+  --app-muted: #444444;
+  --app-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.4);
+  --app-shadow-card-md: 0 4px 8px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Base ─────────────────────────────────────────────── */
-@layer base {
-  * { box-sizing: border-box; }
+* { box-sizing: border-box; }
 
-  body {
-    background: var(--app-bg);
-    color: var(--app-text);
-    font-family: 'IBM Plex Sans', system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  ::-webkit-scrollbar            { width: 3px; height: 3px; }
-  ::-webkit-scrollbar-track      { background: transparent; }
-  ::-webkit-scrollbar-thumb      { background: var(--app-border); border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover{ background: var(--app-sub); }
+body {
+  background: var(--app-bg);
+  color: var(--app-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
+
+::-webkit-scrollbar            { width: 3px; height: 3px; }
+::-webkit-scrollbar-track      { background: transparent; }
+::-webkit-scrollbar-thumb      { background: var(--app-border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover{ background: var(--app-sub); }
 
 /* ── Prose ────────────────────────────────────────────── */
 .prose                          { color: #d1d5db; }

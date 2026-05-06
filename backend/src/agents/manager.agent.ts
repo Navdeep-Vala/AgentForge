@@ -51,7 +51,7 @@ export class ManagerAgent {
       try {
         console.log(`[Manager] Decomposing with primary model: ${primaryModel}`);
         const result = await routeModelCall(primaryModel, messages, 2048, signal);
-        return this.parseDecomposition(result.content);
+        return this.parseDecomposition(result.content ?? '');
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
@@ -70,7 +70,7 @@ export class ManagerAgent {
       try {
         console.log(`[Manager] Trying fallback model: ${model}`);
         const result = await routeModelCall(model, messages, 2048, signal);
-        return this.parseDecomposition(result.content);
+        return this.parseDecomposition(result.content ?? '');
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
@@ -114,7 +114,7 @@ export class ManagerAgent {
       try {
         console.log(`[Manager] Synthesizing with primary model: ${primaryModel}`);
         const result = await routeModelCall(primaryModel, messages, 4096, signal);
-        return result.content;
+        return result.content ?? '';
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
@@ -132,7 +132,7 @@ export class ManagerAgent {
       try {
         console.log(`[Manager] Synthesizing with fallback model: ${model}`);
         const result = await routeModelCall(model, messages, 4096, signal);
-        return result.content;
+        return result.content ?? '';
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');

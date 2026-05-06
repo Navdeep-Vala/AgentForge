@@ -29,7 +29,7 @@ export function AgentSidebar() {
   const customVisible = customAgents.filter(a => !a.is_builtin);
 
   return (
-    <aside className="w-52 flex-shrink-0 bg-app-surface border-r border-app-border flex flex-col overflow-hidden">
+    <aside className="w-52 shrink-0 bg-app-surface border-r border-app-border flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-app-border">
         <span className="text-[10px] font-semibold text-app-muted uppercase tracking-widest">Agents</span>
@@ -92,7 +92,7 @@ function AgentItem({ initials, name, role, tag, color, status, currentTask }: Ag
   return (
     <div className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-app-col transition-colors cursor-default">
       {/* Avatar with ring */}
-      <div className="relative flex-shrink-0 mt-0.5">
+      <div className="relative shrink-0 mt-0.5">
         <div
           className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
           style={{ backgroundColor: color, outline: `2px solid ${color}50`, outlineOffset: '2px' }}
@@ -113,7 +113,7 @@ function AgentItem({ initials, name, role, tag, color, status, currentTask }: Ag
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-semibold text-app-text truncate">{name}</span>
           <span
-            className="text-[8px] font-bold px-1 py-0.5 rounded flex-shrink-0"
+            className="text-[8px] font-bold px-1 py-0.5 rounded shrink-0"
             style={{ backgroundColor: `${color}20`, color }}
           >
             {tag}

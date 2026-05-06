@@ -31,7 +31,7 @@ export function FinalReport() {
   };
 
   return (
-    <div className="flex-shrink-0 mx-4 mb-3 bg-app-surface border border-amber-500/25 rounded-lg overflow-hidden">
+    <div className="shrink-0 mx-4 mb-3 bg-app-surface border border-amber-500/25 rounded-lg overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-amber-500/6 border-b border-amber-500/20">
         <div className="flex items-center gap-2">

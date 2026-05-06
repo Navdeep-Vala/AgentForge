@@ -57,7 +57,7 @@ export function TaskCard({ task, onViewOutput }: TaskCardProps) {
         {/* Agent badge */}
         <div className="flex items-center gap-1.5">
           <div
-            className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold flex-shrink-0"
+            className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold shrink-0"
             style={{ backgroundColor: meta.color }}
           >
             {meta.initials}

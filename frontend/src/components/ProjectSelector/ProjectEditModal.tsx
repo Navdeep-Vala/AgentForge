@@ -63,7 +63,7 @@ export function ProjectEditModal({ project, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
       <div className="w-full max-w-md bg-app-surface border border-app-border rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-app-border">
@@ -87,7 +87,7 @@ export function ProjectEditModal({ project, onClose }: Props) {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-app-col border border-app-border rounded-lg px-3 py-2 text-sm text-app-text focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full bg-app-col border border-app-border rounded-lg px-3 py-2 text-sm text-app-text focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
@@ -101,7 +101,7 @@ export function ProjectEditModal({ project, onClose }: Props) {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe this project, tech stack, conventions, or anything agents should know…"
-              className="w-full bg-app-col border border-app-border rounded-lg px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
+              className="w-full bg-app-col border border-app-border rounded-lg px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:outline-hidden focus:ring-1 focus:ring-indigo-500 resize-none"
             />
           </div>
 
@@ -115,7 +115,7 @@ export function ProjectEditModal({ project, onClose }: Props) {
               value={workspacePath}
               onChange={(e) => setWorkspacePath(e.target.value)}
               placeholder="/path/to/local/project"
-              className="w-full bg-app-col border border-app-border rounded-lg px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full bg-app-col border border-app-border rounded-lg px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
@@ -134,12 +134,12 @@ export function ProjectEditModal({ project, onClose }: Props) {
                   setSyncError(null);
                 }}
                 placeholder="https://github.com/user/repo"
-                className="flex-1 bg-app-col border border-app-border rounded-lg px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="flex-1 bg-app-col border border-app-border rounded-lg px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
               />
               <button
                 onClick={handleSync}
                 disabled={!repoUrl.trim() || syncing}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-40 transition-colors flex-shrink-0"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-medium bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-40 transition-colors shrink-0"
               >
                 <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
                 {syncing ? 'Syncing…' : 'Sync'}

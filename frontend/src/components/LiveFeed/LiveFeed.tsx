@@ -69,7 +69,7 @@ export function LiveFeed() {
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   return (
-    <aside className="w-72 flex-shrink-0 bg-app-surface border-l border-app-border flex flex-col overflow-hidden">
+    <aside className="w-72 shrink-0 bg-app-surface border-l border-app-border flex flex-col overflow-hidden">
       {/* Tab header */}
       <div className="flex items-center border-b border-app-border">
         <TabButton
@@ -161,7 +161,7 @@ function FeedItem({ event, onClick }: { event: FeedEvent; onClick: () => void })
       className="flex gap-2.5 px-3 py-2.5 hover:bg-app-col transition-colors border-b border-app-border/50 last:border-0 cursor-pointer group"
     >
       {/* Icon */}
-      <div className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded flex items-center justify-center ${config.bg}`}>
+      <div className={`shrink-0 mt-0.5 w-5 h-5 rounded flex items-center justify-center ${config.bg}`}>
         <Icon size={10} className={config.color} />
       </div>
 
@@ -173,13 +173,13 @@ function FeedItem({ event, onClick }: { event: FeedEvent; onClick: () => void })
           ) : (
             <span className={`text-[9px] font-bold uppercase tracking-wider ${config.color}`}>{config.label}</span>
           )}
-          <span className="text-[9px] text-app-muted flex-shrink-0 tabular-nums">{timeAgo(event.timestamp)}</span>
+          <span className="text-[9px] text-app-muted shrink-0 tabular-nums">{timeAgo(event.timestamp)}</span>
         </div>
         <p className="text-[10px] text-app-sub leading-snug mt-0.5 line-clamp-2">{event.message}</p>
       </div>
 
       {/* Click indicator */}
-      <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity">
         <ChevronRight size={10} className="text-app-muted" />
       </div>
     </li>
@@ -243,7 +243,7 @@ function ChatBubble({ entry }: { entry: ChatEntry }) {
     <div className="flex gap-2 py-2 px-1">
       {/* Avatar */}
       <div
-        className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-[8px] font-bold mt-0.5"
+        className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-white text-[8px] font-bold mt-0.5"
         style={{ backgroundColor: color }}
       >
         {initials}
@@ -291,7 +291,7 @@ function EventDetailModal({ event, onClose }: { event: FeedEvent; onClose: () =>
   const Icon = config.icon;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs" onClick={onClose}>
       <div
         className="w-full max-w-lg mx-4 bg-app-surface border border-app-border rounded-xl shadow-2xl overflow-hidden"
         onClick={e => e.stopPropagation()}

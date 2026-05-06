@@ -49,7 +49,7 @@ export function ProjectSelector() {
       <div className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-app-sub bg-app-col border border-app-border hover:border-app-sub transition-all shadow-sm"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-app-sub bg-app-col border border-app-border hover:border-app-sub transition-all shadow-xs"
         >
           <Folder size={14} className="text-indigo-400" />
           <span className="max-w-[150px] truncate">
@@ -81,28 +81,28 @@ export function ProjectSelector() {
                     autoFocus
                     type="text"
                     placeholder="Project name *"
-                    className="w-full bg-app-bg border border-app-border rounded-md px-2 py-1.5 text-xs text-app-text placeholder:text-app-muted focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full bg-app-bg border border-app-border rounded-md px-2 py-1.5 text-xs text-app-text placeholder:text-app-muted focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                   />
                   <textarea
                     rows={2}
                     placeholder="Context / notes (optional)…"
-                    className="w-full bg-app-bg border border-app-border rounded-md px-2 py-1.5 text-xs text-app-text placeholder:text-app-muted focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none"
+                    className="w-full bg-app-bg border border-app-border rounded-md px-2 py-1.5 text-xs text-app-text placeholder:text-app-muted focus:outline-hidden focus:ring-1 focus:ring-indigo-500 resize-none"
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
                   />
                   <input
                     type="text"
                     placeholder="GitHub/GitLab URL (optional)…"
-                    className="w-full bg-app-bg border border-app-border rounded-md px-2 py-1.5 text-xs text-app-text placeholder:text-app-muted focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full bg-app-bg border border-app-border rounded-md px-2 py-1.5 text-xs text-app-text placeholder:text-app-muted focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
                     value={newRepoUrl}
                     onChange={(e) => setNewRepoUrl(e.target.value)}
                   />
                   <input
                     type="text"
                     placeholder="Workspace path (optional)…"
-                    className="w-full bg-app-bg border border-app-border rounded-md px-2 py-1.5 text-xs text-app-text placeholder:text-app-muted focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full bg-app-bg border border-app-border rounded-md px-2 py-1.5 text-xs text-app-text placeholder:text-app-muted focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
                     value={newWorkspacePath}
                     onChange={(e) => setNewWorkspacePath(e.target.value)}
                   />
@@ -162,7 +162,7 @@ export function ProjectSelector() {
                         )}
                       </div>
                       {currentProject?.id === p.id && (
-                        <Check size={14} className="text-indigo-400 flex-shrink-0" />
+                        <Check size={14} className="text-indigo-400 shrink-0" />
                       )}
                     </button>
                     {/* Edit button */}

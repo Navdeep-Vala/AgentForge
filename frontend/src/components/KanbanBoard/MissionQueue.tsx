@@ -100,7 +100,7 @@ export function MissionQueue() {
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
       {/* Queue header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 flex-shrink-0 border-b border-app-border">
+      <div className="flex items-center gap-2 px-4 py-2.5 shrink-0 border-b border-app-border">
         <LayoutGrid size={12} className="text-app-muted" />
         <span className="text-[10px] font-semibold text-app-muted uppercase tracking-widest">Mission Queue</span>
         <span className="text-[10px] text-app-muted ml-1">· {tasks.length} tasks</span>

@@ -110,7 +110,7 @@ NO_COMMENT`;
     return null;
   }
 
-  const text = result.content.trim();
+  const text = (result.content ?? '').trim();
   if (text.startsWith('NO_COMMENT') || text === '') return null;
 
   const commentTypeMatch = text.match(/^COMMENT_TYPE:\s*(insight|review|refute|praise|question)/im);
@@ -169,7 +169,7 @@ If you have nothing to share right now, respond with exactly: NO_MESSAGE`;
     return null;
   }
 
-  const text = result.content.trim();
+  const text = (result.content ?? '').trim();
   if (text === 'NO_MESSAGE' || text === '') return null;
 
   return { content: text, tokensUsed: result.tokensUsed };
@@ -228,7 +228,7 @@ Return JSON or the literal string NO_NEW_TASKS:
     return [];
   }
 
-  const text = result.content.trim();
+  const text = (result.content ?? '').trim();
   if (text === 'NO_NEW_TASKS' || text === '') return [];
 
   try {
