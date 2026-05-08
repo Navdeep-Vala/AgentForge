@@ -376,17 +376,6 @@ async function runTask(
     emitSSE(sessionId, { type: 'task_failed', taskId: task.id, error: errorMsg });
   }
 }
-  } catch (err) {
-    if (signal.aborted) return;
-
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    const completedAt = Date.now();
-
-    await updateTaskComplete(task.id, 'failed', `Error: ${errorMsg}`, 0, null, completedAt);
-
-    emitSSE(sessionId, { type: 'task_failed', taskId: task.id, error: errorMsg });
-  }
-}
 
 // ─── Cancel ───────────────────────────────────────────────────────────────────
 

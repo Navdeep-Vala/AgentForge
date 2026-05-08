@@ -1,107 +1,60 @@
-import { useState, useEffect } from 'react';
-import { ExternalLink, Clock } from 'lucide-react';
-import { Task } from '../../types';
-
-const AGENT_META: Record<string, { color: string; tag: string; initials: string }> = {
-  researcher: { color: '#3B82F6', tag: 'RES', initials: 'RS' },
-  coder:      { color: '#10B981', tag: 'COD', initials: 'CD' },
-  tester:     { color: '#F59E0B', tag: 'QA',  initials: 'QA' },
-  rnd:        { color: '#8B5CF6', tag: 'RND', initials: 'RD' },
-};
-
-function useElapsed(startedAt: number | null, status: string): string {
-  const [elapsed, setElapsed] = useState('');
-  useEffect(() => {
-    if (status !== 'in_progress' || !startedAt) { setElapsed(''); return; }
-    const update = () => {
-      const secs = Math.floor((Date.now() - startedAt) / 1000);
-      setElapsed(secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m ${secs % 60}s`);
-    };
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
-  }, [startedAt, status]);
-  return elapsed;
-}
+import type { Task, TaskComment } from '../../types';
+import { formatTimeAgo } from '../MissionControl/dashboardUtils';
 
 interface TaskCardProps {
   task: Task;
-  onViewOutput: (task: Task) => void;
+  comments: Record<string, TaskComment[]>;
+  onOpenTask: (task: Task) => void;
 }
 
-export function TaskCard({ task, onViewOutput }: TaskCardProps) {
-  const meta = AGENT_META[task.agent_type] ?? { color: '#6B7280', tag: 'AGT', initials: task.agent_name.slice(0, 2).toUpperCase() };
-  const elapsed = useElapsed(task.started_at, task.status);
-
-  const accentColor =
-    task.status === 'in_progress' ? '#F59E0B' :
-    task.status === 'done'        ? '#10B981' :
-    task.status === 'failed'      ? '#EF4444' :
-    '#9CA3AF';
+export function TaskCard({ task, comments, onOpenTask }: TaskCardProps) {
+  const tags = collectTags(task, comments);
+  const accent = task.status === 'failed' ? '#d26a61' : task.status === 'in_progress' ? '#d8892d' : '#d3aa68';
 
   return (
-    <div
-      className="bg-white rounded-md shadow-card border border-gray-200 border-l-[3px] p-3 flex flex-col gap-2 hover:shadow-card-md transition-shadow cursor-default"
-      style={{ borderLeftColor: accentColor }}
+    <button
+      onClick={() => onOpenTask(task)}
+      className="group w-full rounded-[28px] border border-[#e8e0d4] bg-white px-5 py-5 text-left shadow-[0_12px_30px_rgba(186,160,119,0.08)] transition hover:-translate-y-px hover:shadow-[0_18px_38px_rgba(186,160,119,0.14)]"
+      style={{ boxShadow: `inset 3px 0 0 ${accent}` }}
     >
-      {/* Title */}
-      <p className="text-[11px] font-semibold text-gray-800 leading-snug line-clamp-2">{task.title}</p>
+      <div className="flex items-start gap-4">
+        <span className="pt-1 text-[15px] text-[#c48a29]">↑</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[24px] font-semibold leading-[1.25] tracking-[-0.03em] text-[#1f1d1a]">{task.title}</p>
+          <p className="mt-4 line-clamp-3 text-[17px] leading-7 text-[#7b7469]">{task.description}</p>
 
-      {/* Description */}
-      {task.description && (
-        <p className="text-[10px] text-gray-500 leading-relaxed line-clamp-2">{task.description}</p>
-      )}
-
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-1.5 border-t border-gray-100 mt-auto">
-        {/* Agent badge */}
-        <div className="flex items-center gap-1.5">
-          <div
-            className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[7px] font-bold shrink-0"
-            style={{ backgroundColor: meta.color }}
-          >
-            {meta.initials}
+          <div className="mt-5 flex items-center justify-between gap-3 text-[14px] text-[#968d82]">
+            <span className="truncate font-medium text-[#554f47]">{task.agent_name}</span>
+            <span>{formatTimeAgo(task.completed_at ?? task.started_at ?? task.created_at)}</span>
           </div>
-          <span
-            className="text-[8px] font-bold px-1 py-0.5 rounded"
-            style={{ color: meta.color, backgroundColor: `${meta.color}18` }}
-          >
-            {meta.tag}
-          </span>
-        </div>
 
-        {/* Right: timer / token count / actions */}
-        <div className="flex items-center gap-1.5">
-          {task.status === 'in_progress' && elapsed && (
-            <span className="flex items-center gap-0.5 text-[9px] text-amber-600 font-medium">
-              <Clock size={8} />
-              {elapsed}
-            </span>
-          )}
-          {task.status === 'done' && task.tokens_used > 0 && (
-            <span className="text-[9px] text-gray-400 tabular-nums">{task.tokens_used.toLocaleString()} tk</span>
-          )}
-          {task.status === 'failed' && (
-            <span className="text-[9px] text-red-500 font-semibold">Failed</span>
-          )}
-          {(task.status === 'done' || task.status === 'failed') && task.output && (
-            <button
-              onClick={() => onViewOutput(task)}
-              className="flex items-center gap-0.5 text-[9px] text-indigo-500 hover:text-indigo-700 font-medium transition-colors"
-            >
-              <ExternalLink size={8} />
-              View
-            </button>
+          {tags.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <span key={tag} className="rounded-[12px] bg-[#f5f0e7] px-3 py-1.5 text-[13px] text-[#a2988c]">
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
         </div>
       </div>
-
-      {/* Progress bar for in-progress tasks */}
-      {task.status === 'in_progress' && (
-        <div className="h-0.5 bg-gray-100 rounded-full overflow-hidden -mx-3 -mb-3 mt-1">
-          <div className="h-full bg-amber-400 rounded-full animate-pulse w-2/3" />
-        </div>
-      )}
-    </div>
+    </button>
   );
+}
+
+function collectTags(task: Task, comments: Record<string, TaskComment[]>) {
+  const words = new Set<string>();
+  for (const word of task.title.split(/\s+/)) {
+    const cleaned = word.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (cleaned.length > 4 && words.size < 3) words.add(cleaned);
+  }
+
+  for (const comment of comments[task.id] ?? []) {
+    const mentionMatch = comment.content.match(/@([a-z0-9_-]+)/i);
+    if (mentionMatch && words.size < 5) words.add(`@${mentionMatch[1]}`);
+  }
+
+  if (task.spawned_by_agent && words.size < 5) words.add(`from-${task.spawned_by_agent}`);
+  return Array.from(words);
 }

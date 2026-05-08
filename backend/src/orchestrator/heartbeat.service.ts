@@ -64,6 +64,13 @@ export async function triggerImmediateHeartbeat(
       );
 
       if (!commentary) return;
+      const hasMention = /@[a-z0-9_-]+/i.test(commentary.content);
+      const isActionableComment =
+        commentary.comment_type === 'review' ||
+        commentary.comment_type === 'refute' ||
+        commentary.comment_type === 'question';
+
+      if (!hasMention && !isActionableComment) return;
 
       const comment = {
         id: uuidv4(),

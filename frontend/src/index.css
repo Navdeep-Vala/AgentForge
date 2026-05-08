@@ -19,28 +19,34 @@
 /* ── Theme tokens ─────────────────────────────────────── */
 :root {
   color-scheme: light;
-  --app-bg: #f5f5f5;
-  --app-surface: #ffffff;
-  --app-col: #eeeeee;
-  --app-border: #e2e2e2;
-  --app-text: #111111;
-  --app-sub: #666666;
-  --app-muted: #aaaaaa;
-  --app-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
-  --app-shadow-card-md: 0 4px 8px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --app-bg: #f8f4ee;
+  --app-surface: #fffdfa;
+  --app-col: #f6f1e8;
+  --app-border: #e9dfd0;
+  --app-text: #221f1a;
+  --app-sub: #756d62;
+  --app-muted: #a69b8d;
+  --app-accent: #c48a29;
+  --app-accent-soft: #fff6ea;
+  --app-success: #49a77b;
+  --app-shadow-card: 0 10px 30px rgba(186, 160, 119, 0.08);
+  --app-shadow-card-md: 0 18px 38px rgba(186, 160, 119, 0.14);
 }
 
 .dark {
   color-scheme: dark;
-  --app-bg: #111111;
-  --app-surface: #1a1a1a;
-  --app-col: #161616;
-  --app-border: #2a2a2a;
-  --app-text: #f0f0f0;
-  --app-sub: #888888;
-  --app-muted: #444444;
-  --app-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 4px rgba(0, 0, 0, 0.4);
-  --app-shadow-card-md: 0 4px 8px rgba(0, 0, 0, 0.6), 0 1px 3px rgba(0, 0, 0, 0.5);
+  --app-bg: #171411;
+  --app-surface: #201c18;
+  --app-col: #29241f;
+  --app-border: #3b332b;
+  --app-text: #f3ede4;
+  --app-sub: #c7bba9;
+  --app-muted: #8f8373;
+  --app-accent: #d8a14a;
+  --app-accent-soft: #34281d;
+  --app-success: #5db68e;
+  --app-shadow-card: 0 10px 30px rgba(0, 0, 0, 0.26);
+  --app-shadow-card-md: 0 18px 42px rgba(0, 0, 0, 0.34);
 }
 
 /* ── Base ─────────────────────────────────────────────── */
@@ -52,6 +58,10 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  background: var(--app-bg);
 }
 
 ::-webkit-scrollbar            { width: 3px; height: 3px; }

@@ -1,135 +1,113 @@
+import { useEffect, useMemo } from 'react';
 import { useSessionStore } from '../../store/sessionStore';
 import { useAgentStore } from '../../store/agentStore';
-import { useEffect } from 'react';
+import { getAgentCatalog, getAgentStatus, type AgentCatalogItem } from '../MissionControl/dashboardUtils';
 
-const BUILT_IN_AGENTS = [
-  { type: 'researcher', name: 'Researcher', role: 'Research Specialist', tag: 'RES', color: '#3B82F6', initials: 'RS' },
-  { type: 'coder',      name: 'Coder',      role: 'Full-Stack Engineer', tag: 'COD', color: '#10B981', initials: 'CD' },
-  { type: 'tester',     name: 'Tester',     role: 'QA Engineer',         tag: 'QA',  color: '#F59E0B', initials: 'QA' },
-  { type: 'rnd',        name: 'R&D Analyst',role: 'Competitive Intel',   tag: 'RND', color: '#8B5CF6', initials: 'RD' },
-] as const;
+interface AgentSidebarProps {
+  selectedAgentType: string | null;
+  onSelectAgent: (agent: AgentCatalogItem) => void;
+}
 
-export function AgentSidebar() {
+export function AgentSidebar({ selectedAgentType, onSelectAgent }: AgentSidebarProps) {
   const { currentSession } = useSessionStore();
-  const { agents: customAgents, fetchAgents } = useAgentStore();
-  const tasks = currentSession?.tasks ?? [];
+  const { agents, fetchAgents } = useAgentStore();
 
-  useEffect(() => { fetchAgents(); }, []);
+  useEffect(() => {
+    fetchAgents();
+  }, [fetchAgents]);
 
-  const getStatus = (type: string): 'working' | 'idle' | 'done' => {
-    const agentTasks = tasks.filter(t => t.agent_type === type);
-    if (agentTasks.some(t => t.status === 'in_progress')) return 'working';
-    if (agentTasks.length > 0 && agentTasks.every(t => t.status === 'done' || t.status === 'failed' || t.status === 'cancelled')) return 'done';
-    return 'idle';
-  };
-
-  const getCurrentTask = (type: string) =>
-    tasks.find(t => t.agent_type === type && t.status === 'in_progress')?.title;
-
-  const customVisible = customAgents.filter(a => !a.is_builtin);
+  const catalog = useMemo(() => getAgentCatalog(agents, currentSession), [agents, currentSession]);
+  const activeCount = useMemo(
+    () => catalog.filter((agent) => getAgentStatus(agent.type, currentSession) === 'working').length,
+    [catalog, currentSession]
+  );
+  const AllAgentsIcon = catalog[0]?.icon;
 
   return (
-    <aside className="w-52 shrink-0 bg-app-surface border-r border-app-border flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-app-border">
-        <span className="text-[10px] font-semibold text-app-muted uppercase tracking-widest">Agents</span>
-        <span className="text-[9px] font-bold text-app-sub bg-app-col rounded-full w-5 h-5 flex items-center justify-center border border-app-border">
-          {BUILT_IN_AGENTS.length + customVisible.length}
-        </span>
+    <aside className="w-[260px] shrink-0 border-r border-[var(--app-border)] bg-[var(--app-surface)]">
+      <div className="flex items-center justify-between border-b border-[var(--app-border)] px-5 py-4">
+        <div className="flex items-center gap-3">
+          <span className="h-2 w-2 rounded-full bg-[var(--app-success)]" />
+          <span className="text-[13px] font-semibold uppercase tracking-[0.22em] text-[var(--app-text)]">Agents</span>
+        </div>
+        <span className="rounded-[10px] bg-[var(--app-col)] px-2.5 py-1 text-[12px] text-[var(--app-muted)]">{catalog.length}</span>
       </div>
 
-      {/* Agent list */}
-      <div className="flex-1 overflow-y-auto py-1">
-        {BUILT_IN_AGENTS.map(agent => (
-          <AgentItem
+      <div className="border-b border-[var(--app-border)] px-4 py-4">
+        <button
+          onClick={() => onSelectAgent(catalog[0])}
+          className={`flex w-full items-center gap-3 rounded-[22px] border px-3 py-3 text-left transition ${
+            selectedAgentType === 'manager' ? 'border-[var(--app-accent)]/35 bg-[var(--app-accent-soft)]' : 'border-[var(--app-border)] bg-[var(--app-surface)] hover:bg-[var(--app-col)]'
+          }`}
+        >
+          <div className="grid h-12 w-12 place-items-center rounded-[16px] border border-[var(--app-border)] bg-[linear-gradient(140deg,#e3a15c,#8756d5)] text-white shadow-[var(--app-shadow-card)]">
+            {AllAgentsIcon ? <AllAgentsIcon size={20} /> : null}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[18px] font-semibold tracking-[-0.02em] text-[var(--app-text)]">All Agents</p>
+            <p className="mt-1 text-[13px] text-[var(--app-sub)]">{catalog.length} total</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-success)]">{activeCount} Active</p>
+          </div>
+        </button>
+      </div>
+
+      <div className="h-[calc(100vh-148px)] overflow-y-auto pb-4">
+        {catalog.map((agent) => (
+          <AgentRow
             key={agent.type}
-            initials={agent.initials}
-            name={agent.name}
-            role={agent.role}
-            tag={agent.tag}
-            color={agent.color}
-            status={getStatus(agent.type)}
-            currentTask={getCurrentTask(agent.type)}
+            agent={agent}
+            selected={selectedAgentType === agent.type}
+            status={getAgentStatus(agent.type, currentSession)}
+            onClick={() => onSelectAgent(agent)}
           />
         ))}
-
-        {customVisible.length > 0 && (
-          <>
-            <div className="px-4 pt-3 pb-1">
-              <div className="h-px bg-app-border" />
-              <p className="text-[9px] text-app-muted uppercase tracking-widest mt-2">Custom</p>
-            </div>
-            {customVisible.map(agent => (
-              <AgentItem
-                key={agent.type}
-                initials={agent.name.slice(0, 2).toUpperCase()}
-                name={agent.name}
-                role={agent.description}
-                tag="CST"
-                color={agent.color}
-                status={getStatus(agent.type)}
-                currentTask={getCurrentTask(agent.type)}
-              />
-            ))}
-          </>
-        )}
       </div>
     </aside>
   );
 }
 
-interface AgentItemProps {
-  initials: string;
-  name: string;
-  role: string;
-  tag: string;
-  color: string;
-  status: 'working' | 'idle' | 'done';
-  currentTask?: string;
-}
+function AgentRow({
+  agent,
+  selected,
+  status,
+  onClick,
+}: {
+  agent: AgentCatalogItem;
+  selected: boolean;
+  status: 'working' | 'waiting' | 'done' | 'offline';
+  onClick: () => void;
+}) {
+  const Icon = agent.icon;
+  const statusText = status === 'working' ? 'Working' : status === 'waiting' ? 'Waiting' : status === 'done' ? 'Done' : 'Standby';
+  const statusColor = status === 'working' ? 'text-[#38a772]' : status === 'waiting' ? 'text-[#c48a29]' : 'text-[#9b9388]';
 
-function AgentItem({ initials, name, role, tag, color, status, currentTask }: AgentItemProps) {
   return (
-    <div className="flex items-start gap-2.5 px-3 py-2.5 hover:bg-app-col transition-colors cursor-default">
-      {/* Avatar with ring */}
-      <div className="relative shrink-0 mt-0.5">
-        <div
-          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
-          style={{ backgroundColor: color, outline: `2px solid ${color}50`, outlineOffset: '2px' }}
-        >
-          {initials}
-        </div>
-        <span
-          className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-app-surface ${
-            status === 'working' ? 'bg-emerald-500 animate-pulse' :
-            status === 'done'    ? 'bg-app-muted' :
-            'bg-app-border'
-          }`}
-        />
+    <button
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 border-b border-[var(--app-border)] px-4 py-3.5 text-left transition ${
+        selected ? 'bg-[var(--app-col)]' : 'hover:bg-[var(--app-col)]/70'
+      }`}
+    >
+      <div className="grid h-12 w-12 place-items-center rounded-[16px] border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[var(--app-shadow-card)]">
+        <Icon size={20} style={{ color: agent.color }} />
       </div>
 
-      {/* Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-semibold text-app-text truncate">{name}</span>
-          <span
-            className="text-[8px] font-bold px-1 py-0.5 rounded shrink-0"
-            style={{ backgroundColor: `${color}20`, color }}
-          >
-            {tag}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-[16px] font-semibold tracking-[-0.02em] text-[var(--app-text)]">{agent.name}</p>
+          <span className="rounded-[10px] border border-[var(--app-accent)]/20 bg-[var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--app-accent)]">
+            {agent.badge}
           </span>
         </div>
-        <p className="text-[9px] text-app-muted truncate leading-none mt-0.5">{role}</p>
-        {status === 'working' && currentTask ? (
-          <p className="text-[9px] text-emerald-500 truncate mt-1 leading-none">{currentTask}</p>
-        ) : (
-          <span className={`inline-block text-[9px] font-medium uppercase tracking-wide mt-1 ${
-            status === 'done' ? 'text-app-muted' : 'text-app-muted'
-          }`}>
-            {status === 'done' ? 'Done' : 'Idle'}
-          </span>
-        )}
+        <p className="mt-0.5 truncate text-[13px] text-[var(--app-sub)]">{agent.shortRole}</p>
       </div>
-    </div>
+
+      <div className={`flex items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] ${statusColor}`}>
+        <span className={`h-2.5 w-2.5 rounded-full ${status === 'working' ? 'bg-[#38a772]' : status === 'waiting' ? 'bg-[#d8a14a]' : 'bg-[#d3ccc2]'}`} />
+        {statusText}
+      </div>
+    </button>
   );
 }

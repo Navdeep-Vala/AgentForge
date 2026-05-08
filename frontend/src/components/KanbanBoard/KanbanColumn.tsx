@@ -1,38 +1,31 @@
-import { Task } from '../../types';
+import type { Task, TaskComment } from '../../types';
 import { TaskCard } from './TaskCard';
 
 interface KanbanColumnProps {
   title: string;
   dotColor: string;
   tasks: Task[];
-  onViewOutput: (task: Task) => void;
-  pulseDot?: boolean;
+  comments: Record<string, TaskComment[]>;
+  onOpenTask: (task: Task) => void;
 }
 
-export function KanbanColumn({ title, dotColor, tasks, onViewOutput, pulseDot }: KanbanColumnProps) {
+export function KanbanColumn({ title, dotColor, tasks, comments, onOpenTask }: KanbanColumnProps) {
   return (
-    <div className="flex flex-col min-h-0 bg-app-col rounded-lg border border-app-border">
-      {/* Column header */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-app-border shrink-0">
-        <span className={`w-1.5 h-1.5 rounded-full ${dotColor} ${pulseDot ? 'animate-pulse' : ''}`} />
-        <span className="text-[11px] font-semibold text-app-sub tracking-wide">{title}</span>
-        <span className="ml-auto text-[10px] font-semibold text-app-muted bg-app-border rounded-full px-1.5 py-0.5 min-w-[18px] text-center tabular-nums">
-          {tasks.length}
-        </span>
+    <section className="min-w-[300px] flex-1 border-r border-[#ede3d6] last:border-r-0">
+      <div className="flex items-center gap-3 border-b border-[#ede3d6] px-5 py-4">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: dotColor }} />
+        <span className="text-[15px] font-semibold uppercase tracking-[0.18em] text-[#5a554e]">{title}</span>
+        <span className="ml-auto rounded-[10px] bg-[#f6f1e8] px-3 py-1 text-[13px] text-[#b0a79b]">{tasks.length}</span>
       </div>
-
-      {/* Cards */}
-      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+      <div className="flex h-[calc(100vh-266px)] flex-col gap-4 overflow-y-auto px-4 py-4">
         {tasks.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center py-8">
-            <p className="text-[10px] text-app-muted">Empty</p>
+          <div className="rounded-[24px] border border-dashed border-[#e5dccf] bg-[#fffdf9] px-4 py-8 text-center text-[14px] text-[#b0a79b]">
+            No tasks here
           </div>
         ) : (
-          tasks.map(task => (
-            <TaskCard key={task.id} task={task} onViewOutput={onViewOutput} />
-          ))
+          tasks.map((task) => <TaskCard key={task.id} task={task} comments={comments} onOpenTask={onOpenTask} />)
         )}
       </div>
-    </div>
+    </section>
   );
 }

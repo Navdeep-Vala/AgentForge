@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Session, SessionSummary, AgentDefinition, TaskComment } from '../types';
+import { Session, SessionSummary, AgentDefinition, TaskComment, ChatMessage } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001';
 
@@ -76,6 +76,31 @@ export async function deleteAgent(id: string): Promise<void> {
 
 export async function getTask(taskId: string): Promise<{ task: unknown; comments: TaskComment[] }> {
   const res = await api.get<{ task: unknown; comments: TaskComment[] }>(`/tasks/${taskId}`);
+  return res.data;
+}
+
+export async function addTaskComment(
+  taskId: string,
+  payload: {
+    agent_type: string;
+    agent_name: string;
+    content: string;
+    comment_type?: TaskComment['comment_type'];
+  }
+): Promise<{ comment: TaskComment }> {
+  const res = await api.post<{ comment: TaskComment }>(`/tasks/${taskId}/comments`, payload);
+  return res.data;
+}
+
+export async function addSessionChatMessage(
+  sessionId: string,
+  payload: {
+    agent_type: string;
+    agent_name: string;
+    content: string;
+  }
+): Promise<{ message: ChatMessage }> {
+  const res = await api.post<{ message: ChatMessage }>(`/sessions/${sessionId}/chat`, payload);
   return res.data;
 }
 

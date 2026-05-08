@@ -1,163 +1,104 @@
-import { useState } from 'react';
-import { LayoutGrid, AlertTriangle, Loader2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { BriefcaseBusiness } from 'lucide-react';
 import { useSessionStore } from '../../store/sessionStore';
+import type { Task } from '../../types';
+import { getMentionedTaskIds, getMissionLane, taskNeedsReview } from '../MissionControl/dashboardUtils';
 import { KanbanColumn } from './KanbanColumn';
-import { FinalReport } from '../FinalReport/FinalReport';
-import { OutputModal } from '../OutputModal/OutputModal';
-import { Task } from '../../types';
 
-export function MissionQueue() {
-  const { currentSession, error } = useSessionStore();
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+const FILTERS = ['all', 'images', 'inbox', 'assigned', 'active', 'review', 'done', 'waiting'] as const;
+type QueueFilter = (typeof FILTERS)[number];
+
+interface MissionQueueProps {
+  onOpenTask: (task: Task) => void;
+}
+
+export function MissionQueue({ onOpenTask }: MissionQueueProps) {
+  const { currentSession, comments } = useSessionStore();
+  const [activeFilter, setActiveFilter] = useState<QueueFilter>('all');
   const tasks = currentSession?.tasks ?? [];
 
-  const queue      = tasks.filter(t => t.status === 'todo');
-  const inProgress = tasks.filter(t => t.status === 'in_progress');
-  const done       = tasks.filter(t => t.status === 'done');
-  const failed     = tasks.filter(t => t.status === 'failed' || t.status === 'cancelled');
+  const mentionedTaskIds = useMemo(() => new Set(getMentionedTaskIds(comments)), [comments]);
+  const columns = useMemo(
+    () => ({
+      inbox: tasks.filter((task) => getMissionLane(task, comments) === 'inbox'),
+      assigned: tasks.filter((task) => getMissionLane(task, comments) === 'assigned'),
+      in_progress: tasks.filter((task) => getMissionLane(task, comments) === 'in_progress'),
+      review: tasks.filter((task) => getMissionLane(task, comments) === 'review'),
+      done: tasks.filter((task) => getMissionLane(task, comments) === 'done'),
+      navdeep: tasks.filter((task) => getMissionLane(task, comments) === 'navdeep'),
+    }),
+    [tasks, comments]
+  );
 
-  // No session at all — show welcome state
-  if (!currentSession) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-6">
-        <div className="w-14 h-14 rounded-xl bg-app-col border border-app-border flex items-center justify-center">
-          <LayoutGrid size={24} className="text-app-muted" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-app-text">Your AI team is standing by</p>
-          <p className="text-xs text-app-muted mt-1">Enter a goal above to deploy your agent team</p>
-        </div>
-        <div className="flex items-center gap-5 mt-1">
-          {[
-            { label: 'Researcher', color: '#3B82F6' },
-            { label: 'Coder',      color: '#10B981' },
-            { label: 'Tester',     color: '#F59E0B' },
-            { label: 'R&D',        color: '#8B5CF6' },
-          ].map(a => (
-            <div key={a.label} className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: a.color }} />
-              <span className="text-[10px] text-app-muted">{a.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const filteredColumns = useMemo(() => {
+    const matchesFilter = (task: Task) => {
+      if (activeFilter === 'all') return true;
+      if (activeFilter === 'images') return /image|design|ui|visual/i.test(`${task.title} ${task.description}`);
+      if (activeFilter === 'inbox') return getMissionLane(task, comments) === 'inbox';
+      if (activeFilter === 'assigned') return getMissionLane(task, comments) === 'assigned';
+      if (activeFilter === 'active') return getMissionLane(task, comments) === 'in_progress';
+      if (activeFilter === 'review') return taskNeedsReview(task, comments);
+      if (activeFilter === 'done') return task.status === 'done';
+      if (activeFilter === 'waiting') return task.status === 'todo' || mentionedTaskIds.has(task.id);
+      return true;
+    };
 
-  // Session exists but failed before creating any tasks
-  if (currentSession.status === 'cancelled' && tasks.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-6">
-        <div className="w-14 h-14 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-          <AlertTriangle size={24} className="text-red-500" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-app-text">Session Failed</p>
-          <p className="text-xs text-app-muted mt-1 max-w-md">
-            {error || 'The session was cancelled before tasks could be created.'}
-          </p>
-          <p className="text-xs text-app-muted mt-2">
-            Goal: <span className="text-app-text italic">"{currentSession.goal}"</span>
-          </p>
-        </div>
-        <p className="text-[10px] text-app-muted">Use the <span className="font-semibold text-amber-500">Retry</span> button above to try again</p>
-      </div>
-    );
-  }
-
-  // Session pending — manager is planning
-  if (currentSession.status === 'pending' || (currentSession.status === 'running' && tasks.length === 0)) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center px-8 gap-6">
-        <div className="relative w-14 h-14 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center">
-          <Loader2 size={24} className="text-pink-500 animate-spin" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-app-text">Manager is analyzing your goal</p>
-          <p className="text-xs text-app-muted mt-1 max-w-md">
-            Breaking down <span className="text-app-text italic">"{currentSession.goal}"</span> into actionable tasks…
-          </p>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          <div className="flex gap-1">
-            {[0,1,2].map(i => (
-              <span
-                key={i}
-                className="w-1.5 h-1.5 rounded-full bg-pink-500"
-                style={{
-                  animation: 'pulse 1.4s ease-in-out infinite',
-                  animationDelay: `${i * 0.2}s`
-                }}
-              />
-            ))}
-          </div>
-          <span className="text-[10px] text-pink-500 font-medium">This usually takes 10–30 seconds</span>
-        </div>
-      </div>
-    );
-  }
+    return {
+      inbox: columns.inbox.filter(matchesFilter),
+      assigned: columns.assigned.filter(matchesFilter),
+      in_progress: columns.in_progress.filter(matchesFilter),
+      review: columns.review.filter(matchesFilter),
+      done: columns.done.filter(matchesFilter),
+      navdeep: columns.navdeep.filter(matchesFilter),
+    };
+  }, [activeFilter, columns, comments, mentionedTaskIds]);
 
   return (
-    <div className="flex-1 overflow-hidden flex flex-col">
-      {/* Queue header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 shrink-0 border-b border-app-border">
-        <LayoutGrid size={12} className="text-app-muted" />
-        <span className="text-[10px] font-semibold text-app-muted uppercase tracking-widest">Mission Queue</span>
-        <span className="text-[10px] text-app-muted ml-1">· {tasks.length} tasks</span>
-        {currentSession.status === 'running' && (
-          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Running
+    <main className="min-w-0 flex-1 bg-[var(--app-surface)]">
+      <div className="flex items-center justify-between border-b border-[var(--app-border)] px-5 py-4">
+        <div className="flex items-center gap-3">
+          <span className="h-2 w-2 rounded-full bg-[var(--app-accent)]" />
+          <span className="text-[13px] font-semibold uppercase tracking-[0.22em] text-[var(--app-text)]">Mission Queue</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="rounded-[10px] bg-[var(--app-col)] px-2.5 py-1 text-[12px] text-[var(--app-muted)]">
+            {tasks.length}
           </span>
-        )}
-        {currentSession.status === 'completed' && (
-          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-emerald-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Completed
+          <span className="rounded-[10px] bg-[var(--app-col)] px-2.5 py-1 text-[12px] text-[var(--app-muted)]">
+            {columns.in_progress.length} active
           </span>
-        )}
-        {currentSession.status === 'cancelled' && (
-          <span className="ml-auto flex items-center gap-1.5 text-[10px] text-red-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-            Cancelled
-          </span>
-        )}
-      </div>
-
-      {/* Kanban columns */}
-      <div className="flex-1 overflow-hidden px-4 pt-4 pb-2">
-        <div className="h-full grid grid-cols-4 gap-3">
-          <KanbanColumn
-            title="Queue"
-            dotColor="bg-app-muted"
-            tasks={queue}
-            onViewOutput={setSelectedTask}
-          />
-          <KanbanColumn
-            title="In Progress"
-            dotColor="bg-amber-400"
-            tasks={inProgress}
-            onViewOutput={setSelectedTask}
-            pulseDot
-          />
-          <KanbanColumn
-            title="Done"
-            dotColor="bg-emerald-500"
-            tasks={done}
-            onViewOutput={setSelectedTask}
-          />
-          <KanbanColumn
-            title="Failed"
-            dotColor="bg-red-500"
-            tasks={failed}
-            onViewOutput={setSelectedTask}
-          />
         </div>
       </div>
 
-      <FinalReport />
+      <div className="border-b border-[var(--app-border)] px-5 py-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {FILTERS.map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setActiveFilter(filter)}
+              className={`rounded-[14px] border px-3.5 py-2 text-[13px] font-medium capitalize transition ${
+                activeFilter === filter
+                  ? 'border-[var(--app-accent)] bg-[var(--app-surface)] text-[var(--app-accent)]'
+                  : 'border-[var(--app-border)] bg-[var(--app-col)] text-[var(--app-sub)]'
+              }`}
+            >
+              {filter}
+            </button>
+          ))}
+          <button className="ml-auto grid h-10 w-10 place-items-center rounded-[14px] bg-[var(--app-col)] text-[var(--app-sub)]">
+            <BriefcaseBusiness size={16} />
+          </button>
+        </div>
+      </div>
 
-      {selectedTask && <OutputModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
-    </div>
+      <div className="flex min-w-0 overflow-x-auto">
+        <KanbanColumn title="Inbox" dotColor="#bbb6af" tasks={filteredColumns.inbox} comments={comments} onOpenTask={onOpenTask} />
+        <KanbanColumn title="Assigned" dotColor="#c48a29" tasks={filteredColumns.assigned} comments={comments} onOpenTask={onOpenTask} />
+        <KanbanColumn title="In Progress" dotColor="#2d9a6e" tasks={filteredColumns.in_progress} comments={comments} onOpenTask={onOpenTask} />
+        <KanbanColumn title="Review" dotColor="#d49a37" tasks={filteredColumns.review} comments={comments} onOpenTask={onOpenTask} />
+        <KanbanColumn title="Done" dotColor="#2d9a6e" tasks={filteredColumns.done} comments={comments} onOpenTask={onOpenTask} />
+        <KanbanColumn title="Navdeep" dotColor="#d8a14a" tasks={filteredColumns.navdeep} comments={comments} onOpenTask={onOpenTask} />
+      </div>
+    </main>
   );
 }

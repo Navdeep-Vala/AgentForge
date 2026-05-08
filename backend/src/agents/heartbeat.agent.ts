@@ -148,7 +148,10 @@ ${recentTaskSummary || '(no recent completed tasks)'}
 Recent team chat:
 ${chatText || '(no recent chat messages)'}
 
-If you have an insight, observation, concern, or question worth sharing with the team, post it now. Be specific. Reference actual outputs or tasks.
+If you have an insight, observation, blocker, or question worth sharing with the team, post it now. Be specific. Reference actual outputs or tasks.
+If you need help from a teammate, mention them with @agent_name.
+If you need human review, approval, or missing context, mention @navdeep directly.
+Do not post generic status updates. Only send a message when it materially helps the team.
 
 If you have nothing to share right now, respond with exactly: NO_MESSAGE`;
 
@@ -200,7 +203,8 @@ ${existingTaskTitles.map((t) => `- ${t}`).join('\n') || '(none)'}
 Recent chat messages:
 ${chatText || '(none)'}
 
-If any message identifies work that should be done and does NOT already exist as a task, create it.
+Only create a new task when the chat clearly indicates missing work, a blocker, or an explicit collaboration handoff, especially when someone tags another teammate with @name.
+Do not spawn broad duplicate tasks or parallel work for agents who are not needed.
 Return JSON or the literal string NO_NEW_TASKS:
 
 {

@@ -7,8 +7,10 @@ import {
   getTasksBySessionId,
   getCommentsBySessionId,
   getChatMessagesBySessionId,
+  createChatMessage,
 } from '../db/queries';
 import { startSession, cancelSession } from '../orchestrator/orchestrator';
+import { emitSSE } from './sse.controller';
 
 const createSessionSchema = z.object({
   goal: z.string().min(1, 'Goal is required').max(2000),
@@ -18,6 +20,12 @@ const createSessionSchema = z.object({
     modelId: z.string().optional(),
     name: z.string().optional(),
   })).optional(),
+});
+
+const createChatMessageSchema = z.object({
+  agent_type: z.string().min(1),
+  agent_name: z.string().min(1),
+  content: z.string().min(1).max(10_000),
 });
 
 export async function createSessionHandler(
@@ -101,6 +109,44 @@ export async function cancelSessionHandler(
 
     await cancelSession(session.id);
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function addSessionChatMessageHandler(
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const session = await getSessionById(req.params.id);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    const parsed = createChatMessageSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0].message });
+      return;
+    }
+
+    const message = {
+      id: uuidv4(),
+      session_id: session.id,
+      agent_type: parsed.data.agent_type,
+      agent_name: parsed.data.agent_name,
+      content: parsed.data.content,
+      spawns_task: false,
+      spawned_task_id: null,
+      created_at: Date.now(),
+    };
+
+    await createChatMessage(message);
+    emitSSE(session.id, { type: 'chat_message', message });
+
+    res.status(201).json({ message });
   } catch (err) {
     next(err);
   }
