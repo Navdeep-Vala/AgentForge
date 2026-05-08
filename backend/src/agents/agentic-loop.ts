@@ -1,6 +1,8 @@
 import { WorkspaceManager } from '../workspace/workspace.manager';
 import { FileService } from '../workspace/file.service';
-import { CommandService } from '../workspace/command.service';
+import { DockerService } from '../sandbox/docker.service';
+import { SandboxCommandService } from '../workspace/sandbox-command.service';
+import { GitService } from '../workspace/git.service';
 import { ToolExecutor } from '../workspace/tool-executor';
 import { AGENT_TOOLS } from '../workspace/tools';
 import { routeModelCall } from '../services/model-router.service';
@@ -23,12 +25,28 @@ export async function executeAgenticTask(
   taskDescription: string,
   workspaceDir: string,
   signal: AbortSignal,
-  modelOverride?: string
+  modelOverride?: string,
+  containerId?: string // NEW: Docker container ID
 ): Promise<AgentTaskResult> {
   const workspace = new WorkspaceManager(workspaceDir);
   const fileService = new FileService(workspace);
-  const commandService = new CommandService(workspace);
-  const toolExecutor = new ToolExecutor(fileService, commandService);
+  
+  // Use Docker services if containerId is provided, otherwise fall back to local services
+  let commandService: any;
+  let gitService: any;
+  
+  if (containerId) {
+    const dockerService = new DockerService();
+    commandService = new SandboxCommandService(dockerService, containerId);
+    gitService = new GitService(dockerService, containerId);
+  } else {
+    // Fallback to local services for backward compatibility
+    import { CommandService } from '../workspace/command.service';
+    commandService = new CommandService(workspace);
+    gitService = null; // GitService requires Docker
+  }
+  
+  const toolExecutor = new ToolExecutor(fileService, commandService, gitService);
 
   const projectTree = await workspace.getProjectTree();
   
@@ -38,22 +56,22 @@ export async function executeAgenticTask(
   
   // Placeholder system prompt
   let systemPrompt = `You are the ${agentName} agent (${agentType}). 
-You have access to tools to interact with the user's codebase.
-Always use tools to explore, read, and modify files when necessary.
-
-## Tools
-You can call the following tools:
-${JSON.stringify(AGENT_TOOLS, null, 2)}
-
-To use a tool, respond with a JSON object in the format:
-{"tool": "tool_name", "args": {"arg1": "val1"}}
-
-Wait for the tool result before proceeding.
-When you are finished, use the 'task_complete' tool with a summary.
-
-## Workspace Structure
-${projectTree}
-`;
+ You have access to tools to interact with the user's codebase.
+ Always use tools to explore, read, and modify files when necessary.
+ 
+ ## Tools
+ You can call the following tools:
+ ${JSON.stringify(AGENT_TOOLS, null, 2)}
+ 
+ To use a tool, respond with a JSON object in the format:
+ {"tool": "tool_name", "args": {"arg1": "val1"}}
+ 
+ Wait for the tool result before proceeding.
+ When you are finished, use the 'task_complete' tool with a summary.
+ 
+ ## Workspace Structure
+ ${projectTree}
+ `;
 
   const messages: OpenRouterMessage[] = [
     { role: 'system', content: systemPrompt },

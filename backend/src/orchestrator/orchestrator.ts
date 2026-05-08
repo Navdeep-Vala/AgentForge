@@ -18,9 +18,12 @@ import {
   getTasksBySessionId,
   incrementSessionTokens,
   getProjectById,
+  updateSessionContainerId,
 } from '../db/queries';
 import { emitSSE, closeSseConnection } from '../controllers/sse.controller';
 import { startHeartbeatJob, stopHeartbeatJob, triggerImmediateHeartbeat } from './heartbeat.service';
+import { DockerService } from '../sandbox/docker.service';
+import { WorkspaceProvisioner } from '../workspace/workspace.provisioner';
 import { Session, Task, CustomAgent, AgentOverride } from '../types';
 
 const managerAgent = new ManagerAgent();
@@ -29,9 +32,9 @@ const abortControllers = new Map<string, AbortController>();
 // ─── Session goal cache (needed by heartbeat dispatcher) ──────────────────────
 const sessionGoals = new Map<string, string>();
 
-function dispatchSpawnedTask(sessionId: string, workspaceDir: string | null | undefined, signal: AbortSignal, agentOverrides?: Record<string, AgentOverride>) {
+async function dispatchSpawnedTask(sessionId: string, workspaceDir: string | null | undefined, signal: AbortSignal, containerId: string | null, agentOverrides?: Record<string, AgentOverride>) {
   return (task: Task): void => {
-    runTask(task, sessionId, workspaceDir, signal, agentOverrides).catch((err) =>
+    runTask(task, sessionId, workspaceDir, signal, agentOverrides, containerId).catch((err) =>
       console.error(`[Orchestrator] Spawned task ${task.id} error:`, err)
     );
   };
@@ -64,6 +67,11 @@ export async function startSession(
     created_at: now,
     updated_at: now,
   };
+
+  // NEW: Docker container provisioning
+  let containerId: string | null = null;
+  const dockerService = new DockerService();
+  const provisioner = new WorkspaceProvisioner(dockerService);
 
   try {
     await createSession(session);
@@ -164,17 +172,46 @@ export async function startSession(
       });
     }
 
+    // NEW: Provision Docker workspace if projectId or workspaceDir is provided
+    if (workspaceDir || projectId) {
+      const effectiveWorkspaceDir = workspaceDir || `/workspaces/${sessionId}`;
+      const project = projectId ? await getProjectById(projectId) : null;
+      
+      try {
+        containerId = await provisioner.provisionWorkspace(
+          sessionId,
+          effectiveWorkspaceDir,
+          project?.repo_url,
+          'main' // could be configurable
+        );
+        // Save container ID to session
+        await updateSessionContainerId(sessionId, containerId);
+      } catch (err) {
+        console.error(`[Orchestrator] Failed to provision workspace:`, err);
+        await updateSessionStatus(sessionId, 'failed', Date.now());
+        emitSSE(sessionId, { 
+          type: 'error', 
+          taskId: '', 
+          message: `Failed to provision workspace: ${err instanceof Error ? err.message : err}` 
+        });
+        closeSseConnection(sessionId);
+        abortControllers.delete(sessionId);
+        sessionGoals.delete(sessionId);
+        return;
+      }
+    }
+
     // Start scheduled heartbeat
     startHeartbeatJob(
       sessionId,
       enrichedGoal,
       session.heartbeat_interval_minutes,
-      dispatchSpawnedTask(sessionId, workspaceDir, signal, agentOverrides),
+      dispatchSpawnedTask(sessionId, workspaceDir, signal, containerId, agentOverrides),
       agentOverrides
     );
 
     // Run all initial tasks in parallel
-    const taskPromises = taskRecords.map((task) => runTask(task, sessionId, workspaceDir, signal, agentOverrides));
+    const taskPromises = taskRecords.map((task) => runTask(task, sessionId, workspaceDir, signal, agentOverrides, containerId));
     await Promise.allSettled(taskPromises);
 
     if (signal.aborted) {
@@ -237,6 +274,20 @@ export async function startSession(
     });
     closeSseConnection(sessionId);
   } finally {
+    // NEW: Cleanup Docker container on session end
+    if (containerId) {
+      try {
+        await dockerService.destroySandbox(containerId);
+        // Optional: delete workspace directory if configured not to persist
+        if (workspaceDir && process.env.SANDBOX_PERSIST_WORKSPACE !== 'true') {
+          import { rm } from 'fs/promises';
+          await rm(workspaceDir, { recursive: true, force: true }).catch(() => {});
+        }
+      } catch (err) {
+        console.error('Failed to destroy sandbox:', err);
+      }
+    }
+    
     abortControllers.delete(sessionId);
     sessionGoals.delete(sessionId);
   }
@@ -249,7 +300,8 @@ async function runTask(
   sessionId: string,
   workspaceDir: string | undefined | null,
   signal: AbortSignal,
-  agentOverrides?: Record<string, AgentOverride>
+  agentOverrides?: Record<string, AgentOverride>,
+  containerId?: string // NEW: Docker container ID
 ): Promise<void> {
   const startedAt = Date.now();
   await updateTaskStatus(task.id, 'in_progress', startedAt);
@@ -270,7 +322,8 @@ async function runTask(
       task.id,
       workspaceDir,
       signal,
-      agentOverrides?.[task.agent_type]?.modelId
+      agentOverrides?.[task.agent_type]?.modelId,
+      containerId // NEW: Pass containerId to executeAgentTask
     );
     const completedAt = Date.now();
 
@@ -305,13 +358,24 @@ async function runTask(
       triggerImmediateHeartbeat(
         sessionId,
         completedTask,
-        dispatchSpawnedTask(sessionId, workspaceDir, signal, agentOverrides),
+        dispatchSpawnedTask(sessionId, workspaceDir, signal, containerId, agentOverrides),
         signal,
         agentOverrides
       ).catch((err) =>
         console.error(`[Orchestrator] Immediate heartbeat error for task ${task.id}:`, err)
       );
     }
+  } catch (err) {
+    if (signal.aborted) return;
+
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    const completedAt = Date.now();
+
+    await updateTaskComplete(task.id, 'failed', `Error: ${errorMsg}`, 0, null, completedAt);
+
+    emitSSE(sessionId, { type: 'task_failed', taskId: task.id, error: errorMsg });
+  }
+}
   } catch (err) {
     if (signal.aborted) return;
 

@@ -47,6 +47,28 @@ export const AGENT_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'delete_file',
+    description: 'Delete a file from the workspace.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Relative path of file to delete' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'file_exists',
+    description: 'Check if a file or directory exists.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Path to check' },
+      },
+      required: ['path'],
+    },
+  },
+  {
     name: 'run_command',
     description: 'Execute a shell command in the workspace directory. Use for npm, git, tests.',
     parameters: {
@@ -56,6 +78,65 @@ export const AGENT_TOOLS: ToolDefinition[] = [
       },
       required: ['command'],
     },
+  },
+  {
+    name: 'git_status',
+    description: 'Show git status of the repository.',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'git_diff',
+    description: 'Show changes between working tree and HEAD. Use to see what files were modified.',
+    parameters: {
+      type: 'object',
+      properties: {
+        file_path: { type: 'string', description: 'Optional specific file to diff' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'git_diff_staged',
+    description: 'Show staged changes (cached diff).',
+    parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'git_add',
+    description: 'Stage files for commit.',
+    parameters: {
+      type: 'object',
+      properties: {
+        paths: { type: 'array', items: { type: 'string' }, description: 'List of file paths to stage' },
+      },
+      required: ['paths'],
+    },
+  },
+  {
+    name: 'git_commit',
+    description: 'Commit staged changes with a message.',
+    parameters: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'Commit message' },
+      },
+      required: ['message'],
+    },
+  },
+  {
+    name: 'git_log',
+    description: 'Show recent commit history.',
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Number of commits to show (default 10)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'git_branch',
+    description: 'Get the current branch name.',
+    parameters: { type: 'object', properties: {} },
   },
   {
     name: 'task_complete',

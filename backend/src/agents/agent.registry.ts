@@ -84,7 +84,8 @@ export async function executeAgentTask(
   taskId?: string,
   workspaceDir?: string | null,
   signal?: AbortSignal,
-  modelOverride?: string
+  modelOverride?: string,
+  containerId?: string // NEW: Docker container ID
 ): Promise<{ content: string; tokensUsed: number; modelUsed: string }> {
   const resolved = await resolveAgent(agentType);
   const fallbackAgent = BUILT_IN_AGENTS['researcher'];
@@ -96,19 +97,20 @@ export async function executeAgentTask(
 
   const primaryModel = modelOverride ?? defaultModel;
 
-  // Use Agentic Loop if workspace is provided
-  if (workspaceDir && sessionId && taskId) {
-    return executeAgenticTask(
-      sessionId,
-      taskId,
-      agentType,
-      agentName,
-      taskDescription,
-      workspaceDir,
-      signal as AbortSignal,
-      primaryModel
-    );
-  }
+   // Use Agentic Loop if workspace is provided
+   if (workspaceDir && sessionId && taskId) {
+     return executeAgenticTask(
+       sessionId,
+       taskId,
+       agentType,
+       agentName,
+       taskDescription,
+       workspaceDir,
+       signal as AbortSignal,
+       primaryModel,
+       containerId
+     );
+   }
 
   const triedModels: string[] = [];
   let lastError: Error = new Error('All models failed for task execution');

@@ -35,30 +35,34 @@ export async function runMigrations(): Promise<void> {
   await addColumnIfNotExists(pool, 'projects', 'description', 'TEXT');
   await addColumnIfNotExists(pool, 'projects', 'repo_context', 'LONGTEXT');
 
-  // ── Sessions ────────────────────────────────────────────────────────────────
-  await pool.execute(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id VARCHAR(36) PRIMARY KEY,
-      project_id VARCHAR(36),
-      goal TEXT NOT NULL,
-      status VARCHAR(20) NOT NULL DEFAULT 'pending',
-      workspace_dir VARCHAR(500),
-      final_report LONGTEXT,
-      total_tokens_used INT DEFAULT 0,
-      estimated_cost_usd DECIMAL(10,6) DEFAULT 0.0,
-      heartbeat_interval_minutes INT DEFAULT 15,
-      created_at BIGINT NOT NULL,
-      updated_at BIGINT NOT NULL,
-      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-  `);
+   // ── Sessions ────────────────────────────────────────────────────────────────
+   await pool.execute(`
+     CREATE TABLE IF NOT EXISTS sessions (
+       id VARCHAR(36) PRIMARY KEY,
+       project_id VARCHAR(36),
+       goal TEXT NOT NULL,
+       status VARCHAR(20) NOT NULL DEFAULT 'pending',
+       workspace_dir VARCHAR(500),
+       final_report LONGTEXT,
+       total_tokens_used INT DEFAULT 0,
+       estimated_cost_usd DECIMAL(10,6) DEFAULT 0.0,
+       heartbeat_interval_minutes INT DEFAULT 15,
+       sandbox_container_id VARCHAR(100) NULL,
+       sandbox_status VARCHAR(20) NULL,
+       created_at BIGINT NOT NULL,
+       updated_at BIGINT NOT NULL,
+       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+   `);
 
-  // Idempotent column additions for pre-existing sessions tables
-  await addColumnIfNotExists(pool, 'sessions', 'project_id', 'VARCHAR(36)');
-  await addColumnIfNotExists(pool, 'sessions', 'workspace_dir', 'VARCHAR(500)');
-  await addColumnIfNotExists(pool, 'sessions', 'total_tokens_used', 'INT DEFAULT 0');
-  await addColumnIfNotExists(pool, 'sessions', 'estimated_cost_usd', 'DECIMAL(10,6) DEFAULT 0.0');
-  await addColumnIfNotExists(pool, 'sessions', 'heartbeat_interval_minutes', 'INT DEFAULT 15');
+   // Idempotent column additions for pre-existing sessions tables
+   await addColumnIfNotExists(pool, 'sessions', 'project_id', 'VARCHAR(36)');
+   await addColumnIfNotExists(pool, 'sessions', 'workspace_dir', 'VARCHAR(500)');
+   await addColumnIfNotExists(pool, 'sessions', 'total_tokens_used', 'INT DEFAULT 0');
+   await addColumnIfNotExists(pool, 'sessions', 'estimated_cost_usd', 'DECIMAL(10,6) DEFAULT 0.0');
+   await addColumnIfNotExists(pool, 'sessions', 'heartbeat_interval_minutes', 'INT DEFAULT 15');
+   await addColumnIfNotExists(pool, 'sessions', 'sandbox_container_id', 'VARCHAR(100) NULL');
+   await addColumnIfNotExists(pool, 'sessions', 'sandbox_status', 'VARCHAR(20) NULL');
 
   // ── Agent Steps ──────────────────────────────────────────────────────────────
   await pool.execute(`

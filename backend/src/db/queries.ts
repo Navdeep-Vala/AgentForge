@@ -242,6 +242,23 @@ export async function cancelSessionTasks(sessionId: string): Promise<void> {
   );
 }
 
+// NEW: Docker sandbox functions
+export async function updateSessionContainerId(
+  id: string,
+  containerId: string | null
+): Promise<void> {
+  const pool = getPool();
+  await pool.execute('UPDATE sessions SET sandbox_container_id = ? WHERE id = ?', [containerId, id]);
+}
+
+export async function updateSessionSandboxStatus(
+  id: string,
+  status: string
+): Promise<void> {
+  const pool = getPool();
+  await pool.execute('UPDATE sessions SET sandbox_status = ? WHERE id = ?', [status, id]);
+}
+
 export async function getAutoSpawnedTaskCount(sessionId: string): Promise<number> {
   const pool = getPool();
   const [rows] = await pool.execute<RowDataPacket[]>(
