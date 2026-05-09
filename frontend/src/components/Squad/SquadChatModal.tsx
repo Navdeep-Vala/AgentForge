@@ -33,41 +33,41 @@ export function SquadChatModal({ sessionId, messages, onClose }: SquadChatModalP
 
   return (
     <Shell title="Squad Chat" onClose={onClose}>
-      <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-2">
+      <div className="max-h-[58vh] space-y-3 overflow-y-auto pr-2">
         {orderedMessages.length === 0 ? (
-          <p className="rounded-[22px] border border-dashed border-[#e4dccf] bg-[#fffdf9] px-5 py-8 text-center text-[15px] text-[#a49b90]">
+          <p className="rounded-[18px] border border-dashed border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-6 text-center text-[13px] text-[var(--app-muted)]">
             Squad chat is quiet right now.
           </p>
         ) : (
           orderedMessages.map((message) => (
-            <article key={message.id} className="rounded-[24px] bg-[#fbf7f1] px-5 py-5">
+            <article key={message.id} className="rounded-[18px] bg-[var(--app-col)] px-4 py-4">
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-full bg-[#f3c08d] text-sm font-semibold text-white">
+                <div className="grid h-9 w-9 place-items-center rounded-full bg-[var(--app-accent)] text-xs font-semibold text-white">
                   {message.agent_name.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
-                  <p className="text-[18px] font-semibold text-[#231f1a]">{message.agent_name}</p>
-                  <p className="text-[13px] text-[#a49a8d]">{formatTimeAgo(message.created_at)}</p>
+                  <p className="text-[15px] font-semibold text-[var(--app-text)]">{message.agent_name}</p>
+                  <p className="text-[11px] text-[var(--app-muted)]">{formatTimeAgo(message.created_at)}</p>
                 </div>
               </div>
-              <p className="mt-4 whitespace-pre-wrap text-[16px] leading-7 text-[#433d36]">{message.content}</p>
+              <p className="mt-3 whitespace-pre-wrap text-[14px] leading-6 text-[var(--app-sub)]">{message.content}</p>
             </article>
           ))
         )}
       </div>
 
-      <div className="mt-6 rounded-[28px] border border-[#e8e0d4] bg-[#fffdfa] p-4">
+      <div className="mt-5 rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] p-3">
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Message the squad... Use @name to direct a teammate."
-          className="min-h-[120px] w-full resize-none rounded-[20px] border border-[#ece3d6] bg-[#fbf8f2] px-4 py-3 text-[16px] leading-7 text-[#23211d] outline-none transition focus:border-[#d7b176]"
+          className="min-h-[96px] w-full resize-none rounded-[16px] border border-[var(--app-border)] bg-[var(--app-col)] px-4 py-3 text-[14px] leading-6 text-[var(--app-text)] outline-none transition focus:border-[var(--app-accent)]"
         />
         <div className="mt-3 flex items-center justify-end">
           <button
             onClick={handleSubmit}
             disabled={!draft.trim() || !sessionId || submitting}
-            className="inline-flex items-center gap-2 rounded-full bg-[#efc28e] px-5 py-3 text-[14px] font-semibold text-[#fffdfa] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full bg-[var(--app-accent)] px-4 py-2.5 text-[12px] font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
             Send
@@ -109,13 +109,13 @@ export function BroadcastModal({ sessionId, onClose }: BroadcastModalProps) {
 
   return (
     <Shell title="Squad Announcement" onClose={onClose}>
-      <div className="space-y-6">
+      <div className="space-y-5">
         <Field label="Title (optional)">
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="e.g. Strategic Direction Change"
-            className="h-16 w-full rounded-[20px] border border-[#ece3d6] bg-[#fbf8f2] px-5 text-[18px] text-[#231f1a] outline-none transition focus:border-[#d7b176]"
+            className="h-14 w-full rounded-[16px] border border-[var(--app-border)] bg-[var(--app-col)] px-4 text-[15px] text-[var(--app-text)] outline-none transition focus:border-[var(--app-accent)]"
           />
         </Field>
 
@@ -124,7 +124,7 @@ export function BroadcastModal({ sessionId, onClose }: BroadcastModalProps) {
             value={body}
             onChange={(event) => setBody(event.target.value)}
             placeholder="Write your announcement to the squad..."
-            className="min-h-[180px] w-full resize-none rounded-[20px] border border-[#ece3d6] bg-[#fbf8f2] px-5 py-4 text-[18px] leading-8 text-[#231f1a] outline-none transition focus:border-[#d7b176]"
+            className="min-h-[160px] w-full resize-none rounded-[16px] border border-[var(--app-border)] bg-[var(--app-col)] px-4 py-3 text-[15px] leading-7 text-[var(--app-text)] outline-none transition focus:border-[var(--app-accent)]"
           />
         </Field>
 
@@ -135,14 +135,14 @@ export function BroadcastModal({ sessionId, onClose }: BroadcastModalProps) {
           </div>
         </Field>
 
-        <div className="flex justify-end gap-3 border-t border-[#eee4d8] pt-6">
-          <button onClick={onClose} className="rounded-full border border-[#ece3d6] px-5 py-3 text-[15px] text-[#7d7568]">
+        <div className="flex justify-end gap-3 border-t border-[var(--app-border)] pt-5">
+          <button onClick={onClose} className="rounded-full border border-[var(--app-border)] px-4 py-2.5 text-[13px] text-[var(--app-sub)]">
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!body.trim() || !sessionId || submitting}
-            className="rounded-full bg-[#efc28e] px-5 py-3 text-[15px] font-semibold text-[#fffdfa] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full bg-[var(--app-accent)] px-4 py-2.5 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? 'Broadcasting…' : 'Broadcast To Squad'}
           </button>
@@ -164,9 +164,9 @@ export function DocsModal({ onClose }: { onClose: () => void }) {
     <Shell title="Docs" onClose={onClose}>
       <div className="space-y-4">
         {docs.map((doc) => (
-          <div key={doc} className="rounded-[22px] border border-[#ebe2d6] bg-[#fbf7f1] px-5 py-5">
-            <p className="text-[18px] font-semibold text-[#231f1a]">{doc}</p>
-            <p className="mt-2 text-[15px] leading-7 text-[#7b7469]">
+          <div key={doc} className="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-col)] px-4 py-4">
+            <p className="text-[15px] font-semibold text-[var(--app-text)]">{doc}</p>
+            <p className="mt-2 text-[13px] leading-6 text-[var(--app-sub)]">
               Available in the workspace for product, mission, and implementation context.
             </p>
           </div>
@@ -178,11 +178,11 @@ export function DocsModal({ onClose }: { onClose: () => void }) {
 
 function Shell({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[rgba(243,238,230,0.5)] backdrop-blur-[2px] p-6">
-      <div className="w-full max-w-4xl rounded-[36px] border border-[#eadfce] bg-[#fffdfa] p-8 shadow-2xl">
-        <div className="mb-8 flex items-center justify-between">
-          <h2 className="text-[36px] font-semibold tracking-[-0.04em] text-[#231f1a]">{title}</h2>
-          <button onClick={onClose} className="rounded-full p-2 text-[#9d9589] transition hover:bg-[#f7f1e8] hover:text-[#21201e]">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/20 backdrop-blur-[2px] p-4">
+      <div className="w-full max-w-3xl rounded-[24px] border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-2xl">
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-[var(--app-text)]">{title}</h2>
+          <button onClick={onClose} className="rounded-full p-2 text-[var(--app-muted)] transition hover:bg-[var(--app-col)] hover:text-[var(--app-text)]">
             <X size={18} />
           </button>
         </div>
@@ -195,7 +195,7 @@ function Shell({ title, children, onClose }: { title: string; children: ReactNod
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <p className="mb-3 text-[14px] font-semibold uppercase tracking-[0.24em] text-[#aba295]">{label}</p>
+      <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--app-muted)]">{label}</p>
       {children}
     </label>
   );
@@ -205,8 +205,8 @@ function PriorityButton({ active, onClick, children }: { active: boolean; onClic
   return (
     <button
       onClick={onClick}
-      className={`rounded-[18px] border px-5 py-3 text-[15px] font-semibold uppercase tracking-[0.12em] ${
-        active ? 'border-[#d3aa68] bg-white text-[#b6873b]' : 'border-[#ece3d6] bg-[#fbf8f2] text-[#b1a89b]'
+      className={`rounded-[14px] border px-4 py-2.5 text-[12px] font-semibold uppercase tracking-[0.12em] ${
+        active ? 'border-[var(--app-accent)] bg-[var(--app-surface)] text-[var(--app-accent)]' : 'border-[var(--app-border)] bg-[var(--app-col)] text-[var(--app-muted)]'
       }`}
     >
       {children}

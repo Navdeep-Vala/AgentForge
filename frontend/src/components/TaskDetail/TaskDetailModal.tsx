@@ -35,24 +35,24 @@ export function TaskDetailModal({ task, comments, onClose }: TaskDetailModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-[rgba(244,238,229,0.44)] backdrop-blur-[2px]">
-      <div className="h-full w-full max-w-[780px] overflow-hidden border-l border-[#e6ddcf] bg-[#fffdfa] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#ece3d6] px-8 py-6">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-[2px]">
+      <div className="h-full w-full max-w-[640px] overflow-hidden border-l border-[var(--app-border)] bg-[var(--app-surface)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[var(--app-border)] px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="h-2 w-2 rounded-full bg-[#4d7ed6]" />
-            <span className="text-[15px] font-semibold uppercase tracking-[0.28em] text-[#21201e]">Task Detail</span>
+            <span className="text-[13px] font-semibold uppercase tracking-[0.22em] text-[var(--app-text)]">Task Detail</span>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-[#9d9589] transition hover:bg-[#f7f1e8] hover:text-[#21201e]">
+          <button onClick={onClose} className="rounded-full p-2 text-[var(--app-muted)] transition hover:bg-[var(--app-col)] hover:text-[var(--app-text)]">
             <X size={18} />
           </button>
         </div>
 
-        <div className="h-[calc(100%-88px)] overflow-y-auto px-8 py-8">
-          <h2 className="max-w-2xl text-[40px] font-semibold leading-tight tracking-[-0.03em] text-[#191816]">
+        <div className="h-[calc(100%-69px)] overflow-y-auto px-6 py-6">
+          <h2 className="max-w-2xl text-[28px] font-semibold leading-tight tracking-[-0.03em] text-[var(--app-text)]">
             {task.title}
           </h2>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <Badge tone={task.status === 'done' ? 'green' : task.status === 'in_progress' ? 'amber' : 'neutral'}>
               {task.status === 'in_progress' ? 'Active' : task.status}
             </Badge>
@@ -62,11 +62,11 @@ export function TaskDetailModal({ task, comments, onClose }: TaskDetailModalProp
           </div>
 
           <Section title="Description">
-            <p className="text-[18px] leading-8 text-[#3e3a34]">{task.description}</p>
+            <p className="text-[15px] leading-7 text-[var(--app-sub)]">{task.description}</p>
           </Section>
 
           <Section title="Context">
-            <div className="rounded-[24px] border border-[#ece4d8] bg-[#fbf8f2] p-5 text-[16px] leading-7 text-[#403a33]">
+            <div className="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-col)] p-4 text-[14px] leading-6 text-[var(--app-sub)]">
               {task.output ? (
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{task.output}</ReactMarkdown>
               ) : (
@@ -76,9 +76,9 @@ export function TaskDetailModal({ task, comments, onClose }: TaskDetailModalProp
           </Section>
 
           <Section title="Assignee">
-            <div className="rounded-[24px] border border-[#ece4d8] bg-[#fffdf9] p-5">
-              <p className="text-[20px] font-semibold text-[#191816]">{task.agent_name}</p>
-              <p className="mt-1 text-[15px] text-[#8b8478]">{task.agent_type}</p>
+            <div className="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] p-4">
+              <p className="text-[16px] font-semibold text-[var(--app-text)]">{task.agent_name}</p>
+              <p className="mt-1 text-[13px] text-[var(--app-muted)]">{task.agent_type}</p>
             </div>
           </Section>
 
@@ -91,39 +91,39 @@ export function TaskDetailModal({ task, comments, onClose }: TaskDetailModalProp
           <Section title={`Comments (${conversation.length})`}>
             <div className="space-y-4">
               {conversation.length === 0 ? (
-                <div className="rounded-[22px] border border-dashed border-[#e4dccf] bg-[#fffdf9] px-5 py-8 text-center text-[15px] text-[#a49b90]">
+                <div className="rounded-[18px] border border-dashed border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-6 text-center text-[13px] text-[var(--app-muted)]">
                   No comments yet. Add your review or mention a teammate with `@name`.
                 </div>
               ) : (
                 conversation.map((comment) => (
-                  <article key={comment.id} className="rounded-[26px] border border-[#ebe2d6] bg-white px-5 py-5 shadow-[0_10px_30px_rgba(196,171,132,0.08)]">
+                  <article key={comment.id} className="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[var(--app-shadow-card)]">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <p className="text-[18px] font-semibold text-[#23211d]">{comment.agent_name}</p>
-                        <p className="mt-1 text-[13px] uppercase tracking-[0.18em] text-[#a0978b]">{comment.comment_type}</p>
+                        <p className="text-[15px] font-semibold text-[var(--app-text)]">{comment.agent_name}</p>
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-[var(--app-muted)]">{comment.comment_type}</p>
                       </div>
-                      <span className="text-[14px] text-[#a1988d]">{formatTimeAgo(comment.created_at)}</span>
+                      <span className="text-[12px] text-[var(--app-muted)]">{formatTimeAgo(comment.created_at)}</span>
                     </div>
-                    <p className="mt-4 whitespace-pre-wrap text-[17px] leading-8 text-[#403a33]">{comment.content}</p>
+                    <p className="mt-3 whitespace-pre-wrap text-[14px] leading-6 text-[var(--app-sub)]">{comment.content}</p>
                   </article>
                 ))
               )}
             </div>
 
-            <div className="mt-5 rounded-[28px] border border-[#e8e0d4] bg-[#fffdfa] p-4">
-              <p className="text-[13px] font-semibold uppercase tracking-[0.18em] text-[#9f968a]">Add Comment</p>
+            <div className="mt-4 rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--app-muted)]">Add Comment</p>
               <textarea
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder="Share a review note, decision, or mention a teammate with @name..."
-                className="mt-3 min-h-[120px] w-full resize-none rounded-[20px] border border-[#ece3d6] bg-[#fbf8f2] px-4 py-3 text-[16px] leading-7 text-[#23211d] outline-none transition focus:border-[#d7b176]"
+                className="mt-3 min-h-[96px] w-full resize-none rounded-[16px] border border-[var(--app-border)] bg-[var(--app-col)] px-4 py-3 text-[14px] leading-6 text-[var(--app-text)] outline-none transition focus:border-[var(--app-accent)]"
               />
               <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-[13px] text-[#9e9588]">All finished tasks can be reviewed here.</p>
+                <p className="text-[11px] text-[var(--app-muted)]">All finished tasks can be reviewed here.</p>
                 <button
                   onClick={handleSubmit}
                   disabled={!draft.trim() || submitting}
-                  className="inline-flex items-center gap-2 rounded-full bg-[#efc28e] px-5 py-3 text-[14px] font-semibold text-[#fffdfa] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-full bg-[var(--app-accent)] px-4 py-2.5 text-[12px] font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                   Post Comment
@@ -139,18 +139,18 @@ export function TaskDetailModal({ task, comments, onClose }: TaskDetailModalProp
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="mt-12">
-      <p className="text-[14px] font-semibold uppercase tracking-[0.24em] text-[#aba295]">{title}</p>
-      <div className="mt-4">{children}</div>
+    <section className="mt-9">
+      <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--app-muted)]">{title}</p>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
 
 function TimelineRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between border-b border-[#f0e7db] py-4 text-[16px] last:border-b-0">
-      <span className="text-[#a1988c]">{label}</span>
-      <span className="text-right text-[#2b2823]">{value}</span>
+    <div className="flex items-center justify-between border-b border-[var(--app-border)] py-3 text-[13px] last:border-b-0">
+      <span className="text-[var(--app-muted)]">{label}</span>
+      <span className="text-right text-[var(--app-text)]">{value}</span>
     </div>
   );
 }
@@ -163,11 +163,11 @@ function Badge({ children, tone }: { children: ReactNode; tone: 'green' | 'amber
         ? 'border-[#d3aa68] bg-white text-[#b6873b]'
         : 'border-[#e8e0d4] bg-[#fbf7f1] text-[#7a7267]';
 
-  return <span className={`rounded-[14px] border px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.14em] ${className}`}>{children}</span>;
+  return <span className={`rounded-[12px] border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] ${className}`}>{children}</span>;
 }
 
 function GhostTag({ children }: { children: ReactNode }) {
-  return <span className="rounded-full bg-[#f5f0e7] px-3 py-1.5 text-[13px] text-[#9b9286]">{children}</span>;
+  return <span className="rounded-full bg-[var(--app-col)] px-3 py-1.5 text-[11px] text-[var(--app-muted)]">{children}</span>;
 }
 
 function taskNeedsHighAttention(task: Task, comments: TaskComment[]) {

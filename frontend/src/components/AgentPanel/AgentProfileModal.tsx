@@ -34,6 +34,7 @@ export function AgentProfileModal({
   const [tab, setTab] = useState<Tab>('attention');
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const AgentIcon = agent.icon;
 
   const agentTasks = useMemo(
     () => (agent.type === 'manager' ? tasks : tasks.filter((task) => task.agent_type === agent.type)),
@@ -86,55 +87,55 @@ export function AgentProfileModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-[rgba(243,238,230,0.5)] backdrop-blur-[2px]">
-      <div className="h-full w-full max-w-[720px] overflow-hidden border-l border-[#e7dece] bg-[#fffdfa] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#eee4d8] px-8 py-6">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-[2px]">
+      <div className="h-full w-full max-w-[620px] overflow-hidden border-l border-[var(--app-border)] bg-[var(--app-surface)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[var(--app-border)] px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="h-2 w-2 rounded-full bg-[#c48a29]" />
-            <span className="text-[15px] font-semibold uppercase tracking-[0.28em] text-[#21201e]">Agent Profile</span>
+            <span className="h-2 w-2 rounded-full bg-[var(--app-accent)]" />
+            <span className="text-[13px] font-semibold uppercase tracking-[0.22em] text-[var(--app-text)]">Agent Profile</span>
           </div>
-          <button onClick={onClose} className="rounded-full p-2 text-[#9d9589] transition hover:bg-[#f7f1e8] hover:text-[#21201e]">
+          <button onClick={onClose} className="rounded-full p-2 text-[var(--app-muted)] transition hover:bg-[var(--app-col)] hover:text-[var(--app-text)]">
             <X size={18} />
           </button>
         </div>
 
-        <div className="h-[calc(100%-88px)] overflow-y-auto">
-          <div className="flex items-center gap-5 border-b border-[#eee4d8] px-8 py-10">
-            <div className="grid h-[86px] w-[86px] place-items-center rounded-[28px] border border-[#eadfce] bg-white">
-              <agent.icon size={32} style={{ color: agent.color }} />
+        <div className="h-[calc(100%-69px)] overflow-y-auto">
+          <div className="flex items-center gap-4 border-b border-[var(--app-border)] px-6 py-6">
+            <div className="grid h-16 w-16 place-items-center rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)]">
+              <AgentIcon size={24} style={{ color: agent.color }} />
             </div>
             <div>
-              <h2 className="text-[44px] font-semibold leading-none tracking-[-0.04em] text-[#191816]">{agent.name}</h2>
-              <p className="mt-3 text-[22px] text-[#736b61]">{agent.shortRole}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <span className="rounded-[14px] border border-[#eddcc7] bg-[#fff8ef] px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-[#c48a29]">
+              <h2 className="text-[28px] font-semibold leading-none tracking-[-0.03em] text-[var(--app-text)]">{agent.name}</h2>
+              <p className="mt-2 text-[16px] text-[var(--app-sub)]">{agent.shortRole}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-[12px] border border-[var(--app-accent)]/20 bg-[var(--app-accent-soft)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--app-accent)]">
                   {agent.badge}
                 </span>
-                <span className="rounded-[16px] border border-[#a7d6c0] bg-[#f1fbf6] px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-[#2d9a6e]">
+                <span className="rounded-[12px] border border-[color:var(--app-success)]/30 bg-[color:var(--app-success)]/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--app-success)]">
                   Working
                 </span>
               </div>
             </div>
           </div>
 
-          <section className="border-b border-[#eee4d8] px-8 py-8">
-            <p className="text-[14px] font-semibold uppercase tracking-[0.24em] text-[#aba295]">About</p>
-            <p className="mt-4 text-[18px] leading-8 text-[#3f3a35]">{agent.about}</p>
+          <section className="border-b border-[var(--app-border)] px-6 py-6">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--app-muted)]">About</p>
+            <p className="mt-3 text-[14px] leading-7 text-[var(--app-sub)]">{agent.about}</p>
           </section>
 
-          <section className="border-b border-[#eee4d8] px-8 py-8">
-            <p className="text-[14px] font-semibold uppercase tracking-[0.24em] text-[#aba295]">Skills</p>
-            <div className="mt-4 flex flex-wrap gap-3">
+          <section className="border-b border-[var(--app-border)] px-6 py-6">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--app-muted)]">Skills</p>
+            <div className="mt-3 flex flex-wrap gap-2">
               {agent.skills.map((skill) => (
-                <span key={skill} className="rounded-[14px] border border-[#ede4d7] bg-[#fffdfa] px-4 py-2 text-[15px] text-[#6a6257]">
+                <span key={skill} className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-surface)] px-3 py-1.5 text-[12px] text-[var(--app-sub)]">
                   {skill}
                 </span>
               ))}
             </div>
           </section>
 
-          <section className="border-b border-[#eee4d8] px-8 py-6">
-            <div className="flex flex-wrap gap-3">
+          <section className="border-b border-[var(--app-border)] px-6 py-4">
+            <div className="flex flex-wrap gap-2">
               <TabButton active={tab === 'attention'} onClick={() => setTab('attention')}>Attention</TabButton>
               <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')}>Tasks</TabButton>
               <TabButton active={tab === 'timeline'} onClick={() => setTab('timeline')}>Timeline</TabButton>
@@ -142,7 +143,7 @@ export function AgentProfileModal({
             </div>
           </section>
 
-          <section className="px-8 py-8">
+          <section className="px-6 py-6">
             {tab === 'attention' && (
               <Panel>
                 {attentionTasks.length === 0 ? (
@@ -202,25 +203,25 @@ export function AgentProfileModal({
             )}
           </section>
 
-          <section className="border-t border-[#eee4d8] px-8 py-8">
-            <p className="text-[14px] font-semibold uppercase tracking-[0.24em] text-[#aba295]">
+          <section className="border-t border-[var(--app-border)] px-6 py-6">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.18em] text-[var(--app-muted)]">
               {agent.isManager ? 'Send Mission To Manager' : `Send Message To ${agent.name}`}
             </p>
-            <div className="mt-4 rounded-[28px] border border-[#e8e0d4] bg-[#fffdfa] p-4">
+            <div className="mt-3 rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] p-3">
               <textarea
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder={agent.isManager ? 'Describe the task or mission you want to launch…' : `Message ${agent.name}… (@ to mention)`}
-                className="min-h-[120px] w-full resize-none rounded-[20px] border border-[#ece3d6] bg-[#fbf8f2] px-4 py-3 text-[16px] leading-7 text-[#23211d] outline-none transition focus:border-[#d7b176]"
+                className="min-h-[96px] w-full resize-none rounded-[16px] border border-[var(--app-border)] bg-[var(--app-col)] px-4 py-3 text-[14px] leading-6 text-[var(--app-text)] outline-none transition focus:border-[var(--app-accent)]"
               />
               <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-[13px] text-[#9e9588]">
+                <p className="text-[11px] text-[var(--app-muted)]">
                   {agent.isManager ? 'The manager profile is now the primary place to start new work.' : 'Mention another teammate with @name to coordinate handoffs.'}
                 </p>
                 <button
                   onClick={handleSubmit}
                   disabled={!draft.trim() || submitting}
-                  className="inline-flex items-center gap-2 rounded-full bg-[#efc28e] px-5 py-3 text-[14px] font-semibold text-[#fffdfa] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-full bg-[var(--app-accent)] px-4 py-2.5 text-[12px] font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                   {agent.isManager ? 'Launch Mission' : 'Send Message'}
@@ -235,12 +236,12 @@ export function AgentProfileModal({
 }
 
 function Panel({ children }: { children: ReactNode }) {
-  return <div className="space-y-4">{children}</div>;
+  return <div className="space-y-3">{children}</div>;
 }
 
 function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-[22px] border border-dashed border-[#e4dccf] bg-[#fffdf9] px-5 py-8 text-center text-[15px] text-[#a49b90]">
+    <div className="rounded-[18px] border border-dashed border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-6 text-center text-[13px] text-[var(--app-muted)]">
       {children}
     </div>
   );
@@ -250,8 +251,8 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   return (
     <button
       onClick={onClick}
-      className={`rounded-full px-4 py-2 text-[15px] font-medium transition ${
-        active ? 'bg-[#fff6ea] text-[#b07a2f]' : 'bg-[#f6f0e7] text-[#9f9689]'
+      className={`rounded-full px-3 py-1.5 text-[12px] font-medium transition ${
+        active ? 'bg-[var(--app-accent-soft)] text-[var(--app-accent)]' : 'bg-[var(--app-col)] text-[var(--app-muted)]'
       }`}
     >
       {children}
@@ -263,16 +264,16 @@ function TaskRow({ task, onOpenTask }: { task: Task; onOpenTask: (task: Task) =>
   return (
     <button
       onClick={() => onOpenTask(task)}
-      className="w-full rounded-[22px] border border-[#ebe2d6] bg-white px-5 py-5 text-left shadow-[0_10px_30px_rgba(196,171,132,0.08)] transition hover:-translate-y-px"
+      className="w-full rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 text-left shadow-[var(--app-shadow-card)] transition hover:-translate-y-px"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[20px] font-semibold leading-snug text-[#221f1c]">{task.title}</p>
-          <p className="mt-2 text-[15px] leading-7 text-[#7b7469]">{task.description}</p>
+          <p className="text-[16px] font-semibold leading-snug text-[var(--app-text)]">{task.title}</p>
+          <p className="mt-1.5 text-[13px] leading-6 text-[var(--app-sub)]">{task.description}</p>
         </div>
-        <span className="whitespace-nowrap text-[13px] uppercase tracking-[0.16em] text-[#a49a8d]">{task.status}</span>
+        <span className="whitespace-nowrap text-[11px] uppercase tracking-[0.14em] text-[var(--app-muted)]">{task.status}</span>
       </div>
-      <p className="mt-4 text-[13px] uppercase tracking-[0.16em] text-[#a49a8d]">{formatTimeAgo(task.completed_at ?? task.started_at ?? task.created_at)}</p>
+      <p className="mt-3 text-[11px] uppercase tracking-[0.14em] text-[var(--app-muted)]">{formatTimeAgo(task.completed_at ?? task.started_at ?? task.created_at)}</p>
     </button>
   );
 }

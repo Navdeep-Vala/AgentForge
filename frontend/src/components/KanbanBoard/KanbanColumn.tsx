@@ -11,15 +11,15 @@ interface KanbanColumnProps {
 
 export function KanbanColumn({ title, dotColor, tasks, comments, onOpenTask }: KanbanColumnProps) {
   return (
-    <section className="min-w-[300px] flex-1 border-r border-[#ede3d6] last:border-r-0">
-      <div className="flex items-center gap-3 border-b border-[#ede3d6] px-5 py-4">
+    <section className="min-w-[250px] flex-1 border-r border-[var(--app-border)] last:border-r-0">
+      <div className="flex items-center gap-2.5 border-b border-[var(--app-border)] px-4 py-3">
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: dotColor }} />
-        <span className="text-[15px] font-semibold uppercase tracking-[0.18em] text-[#5a554e]">{title}</span>
-        <span className="ml-auto rounded-[10px] bg-[#f6f1e8] px-3 py-1 text-[13px] text-[#b0a79b]">{tasks.length}</span>
+        <span className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[var(--app-sub)]">{title}</span>
+        <span className="ml-auto rounded-[10px] bg-[var(--app-col)] px-2.5 py-1 text-[11px] text-[var(--app-muted)]">{tasks.length}</span>
       </div>
-      <div className="flex h-[calc(100vh-266px)] flex-col gap-4 overflow-y-auto px-4 py-4">
+      <div className="flex h-[calc(100vh-208px)] flex-col gap-3 overflow-y-auto px-3 py-3">
         {tasks.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-[#e5dccf] bg-[#fffdf9] px-4 py-8 text-center text-[14px] text-[#b0a79b]">
+          <div className="rounded-[18px] border border-dashed border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-6 text-center text-[12px] text-[var(--app-muted)]">
             No tasks here
           </div>
         ) : (

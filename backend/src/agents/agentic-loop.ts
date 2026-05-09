@@ -3,6 +3,7 @@ import { FileService } from '../workspace/file.service';
 import { DockerService } from '../sandbox/docker.service';
 import { SandboxCommandService } from '../workspace/sandbox-command.service';
 import { GitService } from '../workspace/git.service';
+import { CommandService } from '../workspace/command.service';
 import { ToolExecutor } from '../workspace/tool-executor';
 import { AGENT_TOOLS } from '../workspace/tools';
 import { routeModelCall } from '../services/model-router.service';
@@ -32,16 +33,15 @@ export async function executeAgenticTask(
   const fileService = new FileService(workspace);
   
   // Use Docker services if containerId is provided, otherwise fall back to local services
-  let commandService: any;
-  let gitService: any;
-  
+  let commandService: CommandService | SandboxCommandService;
+  let gitService: GitService | null;
+
   if (containerId) {
     const dockerService = new DockerService();
     commandService = new SandboxCommandService(dockerService, containerId);
     gitService = new GitService(dockerService, containerId);
   } else {
     // Fallback to local services for backward compatibility
-    import { CommandService } from '../workspace/command.service';
     commandService = new CommandService(workspace);
     gitService = null; // GitService requires Docker
   }

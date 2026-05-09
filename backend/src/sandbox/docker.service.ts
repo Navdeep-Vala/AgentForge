@@ -110,7 +110,7 @@ export class DockerService {
         reject(err);
       });
 
-      exec.on('close', (exitCode) => {
+      exec.on('close', (exitCode: number | null) => {
         if (timedOut) return;
         clearTimeout(timeoutHandle);
 
@@ -134,9 +134,15 @@ export class DockerService {
 
     return new Promise((resolve) => {
       const chunks: Buffer[] = [];
-      stream.on('data', (chunk) => chunks.push(chunk));
-      stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
-      stream.on('error', () => resolve(''));
+      stream.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
+    stream.on('end', () => {
+      resolve(Buffer.concat(chunks).toString('utf-8'));
+    });
+    stream.on('error', (_err: unknown) => {
+      resolve('');
+    });
     });
   }
 

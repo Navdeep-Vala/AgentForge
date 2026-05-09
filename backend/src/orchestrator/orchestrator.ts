@@ -32,7 +32,7 @@ const abortControllers = new Map<string, AbortController>();
 // ─── Session goal cache (needed by heartbeat dispatcher) ──────────────────────
 const sessionGoals = new Map<string, string>();
 
-async function dispatchSpawnedTask(sessionId: string, workspaceDir: string | null | undefined, signal: AbortSignal, containerId: string | null, agentOverrides?: Record<string, AgentOverride>) {
+function dispatchSpawnedTask(sessionId: string, workspaceDir: string | undefined, signal: AbortSignal, containerId: string | null, agentOverrides?: Record<string, AgentOverride>) {
   return (task: Task): void => {
     runTask(task, sessionId, workspaceDir, signal, agentOverrides, containerId).catch((err) =>
       console.error(`[Orchestrator] Spawned task ${task.id} error:`, err)
@@ -91,6 +91,8 @@ export async function startSession(
         }
       } catch {
         // best-effort — proceed with original goal if project fetch fails
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.warn(`[Orchestrator] Failed to enrich goal with project context: ${errMsg}`);
       }
     }
     sessionGoals.set(sessionId, enrichedGoal);
@@ -174,10 +176,10 @@ export async function startSession(
 
     // NEW: Provision Docker workspace if projectId or workspaceDir is provided
     if (workspaceDir || projectId) {
-      const effectiveWorkspaceDir = workspaceDir || `/workspaces/${sessionId}`;
-      const project = projectId ? await getProjectById(projectId) : null;
-      
-      try {
+const effectiveWorkspaceDir = workspaceDir || `/workspaces/${sessionId}`;
+    const project = projectId ? await getProjectById(projectId) : null;
+
+    try {
         containerId = await provisioner.provisionWorkspace(
           sessionId,
           effectiveWorkspaceDir,
@@ -188,11 +190,11 @@ export async function startSession(
         await updateSessionContainerId(sessionId, containerId);
       } catch (err) {
         console.error(`[Orchestrator] Failed to provision workspace:`, err);
-        await updateSessionStatus(sessionId, 'failed', Date.now());
-        emitSSE(sessionId, { 
-          type: 'error', 
-          taskId: '', 
-          message: `Failed to provision workspace: ${err instanceof Error ? err.message : err}` 
+        await updateSessionStatus(sessionId, 'cancelled', Date.now());
+        emitSSE(sessionId, {
+          type: 'error',
+          taskId: '',
+          message: `Failed to provision workspace: ${err instanceof Error ? err.message : err}`,
         });
         closeSseConnection(sessionId);
         abortControllers.delete(sessionId);
@@ -280,7 +282,7 @@ export async function startSession(
         await dockerService.destroySandbox(containerId);
         // Optional: delete workspace directory if configured not to persist
         if (workspaceDir && process.env.SANDBOX_PERSIST_WORKSPACE !== 'true') {
-          import { rm } from 'fs/promises';
+          const { rm } = await import('fs/promises');
           await rm(workspaceDir, { recursive: true, force: true }).catch(() => {});
         }
       } catch (err) {
@@ -298,7 +300,7 @@ export async function startSession(
 async function runTask(
   task: Task,
   sessionId: string,
-  workspaceDir: string | undefined | null,
+  workspaceDir: string | undefined,
   signal: AbortSignal,
   agentOverrides?: Record<string, AgentOverride>,
   containerId?: string // NEW: Docker container ID

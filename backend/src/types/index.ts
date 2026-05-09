@@ -1,4 +1,4 @@
-export type SessionStatus = 'pending' | 'running' | 'completed' | 'cancelled';
+export type SessionStatus = 'pending' | 'running' | 'completed' | 'cancelled' | 'failed';
 export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled';
 export type CommentType = 'insight' | 'review' | 'refute' | 'praise' | 'question';
 

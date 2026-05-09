@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -10,6 +10,9 @@
   --color-app-text: var(--app-text);
   --color-app-sub: var(--app-sub);
   --color-app-muted: var(--app-muted);
+  --color-app-accent: var(--app-accent);
+  --color-app-accent-soft: var(--app-accent-soft);
+  --color-app-success: var(--app-success);
   --font-sans: "IBM Plex Sans", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --shadow-card: var(--app-shadow-card);
@@ -50,7 +53,9 @@
 }
 
 /* ── Base ─────────────────────────────────────────────── */
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   background: var(--app-bg);
@@ -64,26 +69,74 @@ body {
   background: var(--app-bg);
 }
 
-::-webkit-scrollbar            { width: 3px; height: 3px; }
-::-webkit-scrollbar-track      { background: transparent; }
-::-webkit-scrollbar-thumb      { background: var(--app-border); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover{ background: var(--app-sub); }
+::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--app-border);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--app-sub);
+}
 
 /* ── Prose ────────────────────────────────────────────── */
-.prose                          { color: #d1d5db; }
-.prose h1,.prose h2,.prose h3   { color: #f9fafb; font-weight: 600; }
-.prose a                        { color: #818cf8; }
-.prose strong                   { color: #e5e7eb; }
-.prose code                     { color: #a5b4fc; background: rgba(255,255,255,.06); padding: 1px 5px; border-radius: 4px; font-size: .8em; }
-.prose pre                      { background: transparent; padding: 0; }
-.prose blockquote               { border-left-color: #4f46e5; color: #9ca3af; }
-.prose ul>li::marker,
-.prose ol>li::marker            { color: #6b7280; }
-.prose table                    { font-size: .8rem; }
-.prose th                       { color: #e5e7eb; background: rgba(255,255,255,.04); }
-.prose td,.prose th             { border-color: rgba(255,255,255,.08); padding: .5rem .75rem; }
-.prose tr                       { border-color: rgba(255,255,255,.06); }
-.prose hr                       { border-color: rgba(255,255,255,.06); }
+.prose {
+  color: #d1d5db;
+}
+.prose h1,
+.prose h2,
+.prose h3 {
+  color: #f9fafb;
+  font-weight: 600;
+}
+.prose a {
+  color: #818cf8;
+}
+.prose strong {
+  color: #e5e7eb;
+}
+.prose code {
+  color: #a5b4fc;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.8em;
+}
+.prose pre {
+  background: transparent;
+  padding: 0;
+}
+.prose blockquote {
+  border-left-color: #4f46e5;
+  color: #9ca3af;
+}
+.prose ul > li::marker,
+.prose ol > li::marker {
+  color: #6b7280;
+}
+.prose table {
+  font-size: 0.8rem;
+}
+.prose th {
+  color: #e5e7eb;
+  background: rgba(255, 255, 255, 0.04);
+}
+.prose td,
+.prose th {
+  border-color: rgba(255, 255, 255, 0.08);
+  padding: 0.5rem 0.75rem;
+}
+.prose tr {
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.prose hr {
+  border-color: rgba(255, 255, 255, 0.06);
+}
 
 /* ── Util ─────────────────────────────────────────────── */
 .line-clamp-2 {

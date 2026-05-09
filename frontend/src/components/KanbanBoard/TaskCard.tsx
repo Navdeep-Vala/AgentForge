@@ -14,24 +14,24 @@ export function TaskCard({ task, comments, onOpenTask }: TaskCardProps) {
   return (
     <button
       onClick={() => onOpenTask(task)}
-      className="group w-full rounded-[28px] border border-[#e8e0d4] bg-white px-5 py-5 text-left shadow-[0_12px_30px_rgba(186,160,119,0.08)] transition hover:-translate-y-px hover:shadow-[0_18px_38px_rgba(186,160,119,0.14)]"
+      className="group w-full rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 text-left shadow-[var(--app-shadow-card)] transition hover:-translate-y-px hover:shadow-[var(--app-shadow-card-md)]"
       style={{ boxShadow: `inset 3px 0 0 ${accent}` }}
     >
-      <div className="flex items-start gap-4">
-        <span className="pt-1 text-[15px] text-[#c48a29]">↑</span>
+      <div className="flex items-start gap-3">
+        <span className="pt-0.5 text-[12px] text-[var(--app-accent)]">↑</span>
         <div className="min-w-0 flex-1">
-          <p className="text-[24px] font-semibold leading-[1.25] tracking-[-0.03em] text-[#1f1d1a]">{task.title}</p>
-          <p className="mt-4 line-clamp-3 text-[17px] leading-7 text-[#7b7469]">{task.description}</p>
+          <p className="text-[17px] font-semibold leading-[1.3] tracking-[-0.02em] text-[var(--app-text)]">{task.title}</p>
+          <p className="mt-2.5 line-clamp-3 text-[13px] leading-6 text-[var(--app-sub)]">{task.description}</p>
 
-          <div className="mt-5 flex items-center justify-between gap-3 text-[14px] text-[#968d82]">
-            <span className="truncate font-medium text-[#554f47]">{task.agent_name}</span>
+          <div className="mt-3.5 flex items-center justify-between gap-3 text-[12px] text-[var(--app-muted)]">
+            <span className="truncate font-medium text-[var(--app-sub)]">{task.agent_name}</span>
             <span>{formatTimeAgo(task.completed_at ?? task.started_at ?? task.created_at)}</span>
           </div>
 
           {tags.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-1.5">
               {tags.map((tag) => (
-                <span key={tag} className="rounded-[12px] bg-[#f5f0e7] px-3 py-1.5 text-[13px] text-[#a2988c]">
+                <span key={tag} className="rounded-[10px] bg-[var(--app-col)] px-2.5 py-1 text-[11px] text-[var(--app-muted)]">
                   {tag}
                 </span>
               ))}
