@@ -75,7 +75,7 @@ export async function resolveAgent(
 
 import { getDynamicFallbacks } from '../services/free-model-pool.service';
 
-import { executeAgenticTask } from './agentic-loop';
+import { executeAgenticTask, AgentTaskResult } from './agentic-loop';
 
 export async function executeAgentTask(
   agentType: string,
@@ -86,7 +86,7 @@ export async function executeAgentTask(
   signal?: AbortSignal,
   modelOverride?: string,
   containerId?: string // NEW: Docker container ID
-): Promise<{ content: string; tokensUsed: number; modelUsed: string }> {
+): Promise<AgentTaskResult> {
   const resolved = await resolveAgent(agentType);
   const fallbackAgent = BUILT_IN_AGENTS['researcher'];
   const { systemPrompt, model: defaultModel, name: agentName } = resolved ?? {
@@ -129,7 +129,15 @@ export async function executeAgentTask(
         4096,
         signal
       );
-      return { ...result, modelUsed: primaryModel, content: result.content || '' };
+      const content = result.content || '';
+      const thought = content.replace(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/gs, '').trim();
+      
+      return { 
+        content,
+        thought,
+        tokensUsed: result.tokensUsed, 
+        modelUsed: primaryModel 
+      };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
@@ -156,7 +164,15 @@ export async function executeAgentTask(
         4096,
         signal
       );
-      return { ...result, modelUsed: model, content: result.content || '' };
+      const content = result.content || '';
+      const thought = content.replace(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/gs, '').trim();
+
+      return { 
+        content,
+        thought,
+        tokensUsed: result.tokensUsed, 
+        modelUsed: model 
+      };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
       const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');

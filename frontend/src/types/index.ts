@@ -1,6 +1,6 @@
 export type SessionStatus = 'pending' | 'running' | 'completed' | 'cancelled';
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled';
-export type CommentType = 'insight' | 'review' | 'refute' | 'praise' | 'question';
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled' | 'needs_approval' | 'waiting_for_predecessor';
+export type CommentType = 'insight' | 'review' | 'refute' | 'praise' | 'question' | 'clarification';
 
 export interface Project {
   id: string;
@@ -26,6 +26,7 @@ export interface Session {
   created_at: number;
   updated_at: number;
   tasks: Task[];
+  subAgents?: SubAgent[];
 }
 
 export interface SessionSummary {
@@ -46,12 +47,20 @@ export interface Task {
   description: string;
   status: TaskStatus;
   output: string | null;
+  thought: string | null;
   tokens_used: number;
   model_used: string | null;
   spawned_by_agent: string | null;
+  parent_task_id: string | null;
   started_at: number | null;
   completed_at: number | null;
   created_at: number;
+}
+
+export interface SpecializedAgentSpawn {
+  agent_type: string;
+  title: string;
+  description: string;
 }
 
 export interface TaskComment {
@@ -75,6 +84,36 @@ export interface ChatMessage {
   spawns_task: boolean;
   spawned_task_id: string | null;
   created_at: number;
+}
+
+export interface SubAgent {
+  id: string;
+  task_id: string;
+  session_id: string;
+  sub_agent_type: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  output: string | null;
+  thought?: string | null;
+  started_at: number | null;
+  completed_at: number | null;
+  created_at: number;
+}
+
+export interface ClarificationRequest {
+  id: string;
+  session_id: string;
+  task_id: string | null;
+  agent_type: string;
+  agent_name: string;
+  question: string;
+  response: string | null;
+  responding_agent_type: string | null;
+  responding_agent_name: string | null;
+  status: 'pending' | 'answered' | 'rejected';
+  created_at: number;
+  responded_at: number | null;
 }
 
 export interface AgentDefinition {
@@ -121,6 +160,7 @@ export type SSEMessage =
         id: string;
         status: 'done';
         output: string | null;
+        thought: string | null;
         tokens_used: number;
         model_used: string | null;
         completed_at: number;
@@ -163,6 +203,15 @@ export type SSEMessage =
       filePath: string;
       changeType: 'created' | 'modified' | 'deleted';
     }
+  | { type: 'sub_agent_spawned'; subAgent: SubAgent }
+  | { type: 'sub_agent_complete'; subAgentId: string; taskId: string; output: string | null; thought?: string }
+  | { type: 'sub_agent_failed'; subAgentId: string; taskId: string; error: string }
+  | { type: 'clarification_request'; clarification: ClarificationRequest }
+  | { type: 'clarification_response'; clarificationId: string; response: string; answeredBy: { agent_type: string; agent_name: string } }
+  | { type: 'needs_approval'; taskId: string; approval_type: string; details: Record<string, any> }
+  | { type: 'approval_response'; taskId: string; approved: boolean; feedback: string }
+  | { type: 'specialized_agent_spawned'; taskId: string; agentType: string; agentName: string; description: string }
+  | { type: 'file_changed'; sessionId: string; taskId: string; filePath: string; changeType: 'created' | 'modified' | 'deleted' }
   | { type: 'error'; taskId: string; message: string };
 
 // ─── Model selector ───────────────────────────────────────────────────────────

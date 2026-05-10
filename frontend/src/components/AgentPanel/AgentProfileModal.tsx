@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Loader2, Send, X } from 'lucide-react';
+import { X, Loader2, Send } from 'lucide-react';
+import { MentionText } from '../Notifications/MentionText';
 import { addSessionChatMessage } from '../../api/client';
 import type { ChatMessage, Task, TaskComment } from '../../types';
 import {
@@ -14,12 +15,13 @@ interface AgentProfileModalProps {
   tasks: Task[];
   comments: Record<string, TaskComment[]>;
   chatMessages: ChatMessage[];
+  subAgentIds: string[];
   onClose: () => void;
   onOpenTask: (task: Task) => void;
   onLaunchMission: (goal: string) => Promise<void>;
 }
 
-type Tab = 'attention' | 'tasks' | 'timeline' | 'messages';
+type Tab = 'attention' | 'tasks' | 'timeline' | 'messages' | 'subagents';
 
 export function AgentProfileModal({
   agent,
@@ -27,6 +29,7 @@ export function AgentProfileModal({
   tasks,
   comments,
   chatMessages,
+  subAgentIds,
   onClose,
   onOpenTask,
   onLaunchMission,
@@ -87,7 +90,10 @@ export function AgentProfileModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-[2px]">
+    <div 
+      className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-[2px]"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="h-full w-full max-w-[620px] overflow-hidden border-l border-[var(--app-border)] bg-[var(--app-surface)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--app-border)] px-6 py-4">
           <div className="flex items-center gap-3">
@@ -138,6 +144,11 @@ export function AgentProfileModal({
             <div className="flex flex-wrap gap-2">
               <TabButton active={tab === 'attention'} onClick={() => setTab('attention')}>Attention</TabButton>
               <TabButton active={tab === 'tasks'} onClick={() => setTab('tasks')}>Tasks</TabButton>
+              {subAgentIds.length > 0 && (
+                <TabButton active={tab === 'subagents'} onClick={() => setTab('subagents')}>
+                  Sub-Agents ({subAgentIds.length})
+                </TabButton>
+              )}
               <TabButton active={tab === 'timeline'} onClick={() => setTab('timeline')}>Timeline</TabButton>
               <TabButton active={tab === 'messages'} onClick={() => setTab('messages')}>Messages</TabButton>
             </div>
@@ -160,6 +171,21 @@ export function AgentProfileModal({
                   <EmptyState>No tasks have been routed here yet.</EmptyState>
                 ) : (
                   agentTasks.map((task) => <TaskRow key={task.id} task={task} onOpenTask={onOpenTask} />)
+                )}
+              </Panel>
+            )}
+
+            {tab === 'subagents' && (
+              <Panel>
+                {subAgentIds.length === 0 ? (
+                  <EmptyState>No sub-agents delegated yet.</EmptyState>
+                ) : (
+                  subAgentIds.map((id) => (
+                    <div key={id} className="rounded-[18px] border border-[#dbeafe] bg-[#f0f9ff] px-4 py-3 text-left shadow-[var(--app-shadow-card)]">
+                      <p className="text-[14px] font-semibold text-[#1e40af]">{id.slice(0, 8)}...</p>
+                      <p className="mt-1 text-[12px] text-[#60a5fa]">{id}</p>
+                    </div>
+                  ))
                 )}
               </Panel>
             )}
@@ -195,7 +221,9 @@ export function AgentProfileModal({
                         <p className="text-[18px] font-semibold text-[#221f1c]">{message.agent_name}</p>
                         <span className="text-[13px] text-[#a49a8d]">{formatTimeAgo(message.created_at)}</span>
                       </div>
-                      <p className="mt-3 whitespace-pre-wrap text-[16px] leading-7 text-[#433d36]">{message.content}</p>
+                      <div className="mt-3 whitespace-pre-wrap text-[16px] leading-7 text-[#433d36]">
+                        <MentionText content={message.content} />
+                      </div>
                     </article>
                   ))
                 )}

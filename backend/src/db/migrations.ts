@@ -118,6 +118,8 @@ export async function runMigrations(): Promise<void> {
 
   await addColumnIfNotExists(pool, 'tasks', 'model_used', 'VARCHAR(200)');
   await addColumnIfNotExists(pool, 'tasks', 'spawned_by_agent', 'VARCHAR(100)');
+  await addColumnIfNotExists(pool, 'tasks', 'parent_task_id', 'VARCHAR(36)');
+  await addColumnIfNotExists(pool, 'tasks', 'thought', 'LONGTEXT');
 
   // ── Task Comments ────────────────────────────────────────────────────────────
   await pool.execute(`
@@ -178,6 +180,47 @@ export async function runMigrations(): Promise<void> {
       created_at BIGINT NOT NULL,
       updated_at BIGINT NOT NULL,
       UNIQUE KEY uk_provider (provider)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // ── Sub-Agents ────────────────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS sub_agents (
+      id VARCHAR(36) PRIMARY KEY,
+      task_id VARCHAR(36) NOT NULL,
+      session_id VARCHAR(36) NOT NULL,
+      sub_agent_type VARCHAR(50) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      description TEXT NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      output LONGTEXT,
+      started_at BIGINT,
+      completed_at BIGINT,
+      created_at BIGINT NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await addColumnIfNotExists(pool, 'sub_agents', 'thought', 'LONGTEXT');
+
+  // ── Clarification Requests ────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS clarification_requests (
+      id VARCHAR(36) PRIMARY KEY,
+      session_id VARCHAR(36) NOT NULL,
+      task_id VARCHAR(36),
+      agent_type VARCHAR(100) NOT NULL,
+      agent_name VARCHAR(100) NOT NULL,
+      question TEXT NOT NULL,
+      context TEXT,
+      options JSON,
+      status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      answer TEXT,
+      created_at BIGINT NOT NULL,
+      answered_at BIGINT,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 

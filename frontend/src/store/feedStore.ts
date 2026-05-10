@@ -15,6 +15,17 @@ export interface FeedEvent {
     | 'session_complete'
     | 'session_started'
     | 'manager_working'
+    | 'sub_agent_started'
+    | 'sub_agent_complete'
+    | 'sub_agent_failed'
+    | 'clarification_request'
+    | 'clarification_response'
+    | 'approval_requested'
+    | 'approval_granted'
+    | 'approval_rejected'
+    | 'approval_result'
+    | 'specialized_agent_spawned'
+    | 'file_changed'
     | 'error';
   message: string;
   agentName?: string;

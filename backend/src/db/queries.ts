@@ -12,6 +12,8 @@ import {
   Project,
   AgentStep,
   FileChange,
+  SubAgent,
+  ClarificationRequest,
 } from '../types';
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -156,8 +158,8 @@ export async function createTask(task: Task): Promise<void> {
   await pool.execute(
     `INSERT INTO tasks
        (id, session_id, agent_type, agent_name, title, description, status,
-        output, tokens_used, model_used, spawned_by_agent, started_at, completed_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        output, thought, tokens_used, model_used, spawned_by_agent, started_at, completed_at, created_at, parent_task_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       task.id,
       task.session_id,
@@ -167,12 +169,14 @@ export async function createTask(task: Task): Promise<void> {
       task.description,
       task.status,
       task.output,
+      task.thought ?? null,
       task.tokens_used,
       task.model_used,
       task.spawned_by_agent,
       task.started_at,
       task.completed_at,
       task.created_at,
+      task.parent_task_id ?? null,
     ]
   );
 }
@@ -225,12 +229,13 @@ export async function updateTaskComplete(
   output: string | null,
   tokensUsed: number,
   modelUsed: string | null,
-  completedAt: number
+  completedAt: number,
+  thought?: string | null
 ): Promise<void> {
   const pool = getPool();
   await pool.execute(
-    'UPDATE tasks SET status = ?, output = ?, tokens_used = ?, model_used = ?, completed_at = ? WHERE id = ?',
-    [status, output, tokensUsed, modelUsed, completedAt, id]
+    'UPDATE tasks SET status = ?, output = ?, tokens_used = ?, model_used = ?, completed_at = ?, thought = ? WHERE id = ?',
+    [status, output, tokensUsed, modelUsed, completedAt, thought ?? null, id]
   );
 }
 
@@ -551,4 +556,129 @@ export async function getFileChangesByTaskId(taskId: string): Promise<FileChange
     [taskId]
   );
   return rows as FileChange[];
+}
+
+// ─── Sub-Agents ───────────────────────────────────────────────────────────────
+
+export async function createSubAgent(subAgent: SubAgent): Promise<void> {
+  const pool = getPool();
+  await pool.execute(
+    `INSERT INTO sub_agents
+       (id, task_id, session_id, sub_agent_type, title, description, status,
+        output, thought, started_at, completed_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      subAgent.id,
+      subAgent.task_id,
+      subAgent.session_id,
+      subAgent.sub_agent_type,
+      subAgent.title,
+      subAgent.description,
+      subAgent.status,
+      subAgent.output,
+      subAgent.thought ?? null,
+      subAgent.started_at,
+      subAgent.completed_at,
+      subAgent.created_at,
+    ]
+  );
+}
+
+export async function getSubAgentsByTaskId(taskId: string): Promise<SubAgent[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT * FROM sub_agents WHERE task_id = ? ORDER BY created_at ASC',
+    [taskId]
+  );
+  return rows as SubAgent[];
+}
+
+export async function getSubAgentsBySessionId(sessionId: string): Promise<SubAgent[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT * FROM sub_agents WHERE session_id = ? ORDER BY created_at ASC',
+    [sessionId]
+  );
+  return rows as SubAgent[];
+}
+
+export async function updateSubAgentStatus(
+  id: string,
+  status: 'pending' | 'running' | 'completed' | 'failed',
+  output?: string | null,
+  thought?: string | null
+): Promise<void> {
+  const pool = getPool();
+  if (output !== undefined) {
+    await pool.execute(
+      'UPDATE sub_agents SET status = ?, output = ?, thought = ?, completed_at = ? WHERE id = ?',
+      [status, output, thought ?? null, Date.now(), id]
+    );
+  } else {
+    await pool.execute(
+      'UPDATE sub_agents SET status = ?, started_at = ? WHERE id = ? AND started_at IS NULL',
+      [status, Date.now(), id]
+    );
+  }
+}
+
+// ─── Clarification Requests ───────────────────────────────────────────────────
+
+export async function createClarificationRequest(req: ClarificationRequest): Promise<void> {
+  const pool = getPool();
+  await pool.execute(
+    `INSERT INTO clarification_requests
+       (id, session_id, task_id, agent_type, agent_name, question, context, options, status, created_at, answered_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      req.id,
+      req.session_id,
+      req.task_id,
+      req.agent_type,
+      req.agent_name,
+      req.question,
+      req.context,
+      req.options ? JSON.stringify(req.options) : null,
+      req.status,
+      req.created_at,
+      req.answered_at,
+    ]
+  );
+}
+
+export async function getClarificationRequestsBySessionId(sessionId: string): Promise<ClarificationRequest[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT * FROM clarification_requests WHERE session_id = ? ORDER BY created_at ASC',
+    [sessionId]
+  );
+  return rows as ClarificationRequest[];
+}
+
+export async function getPendingClarificationRequests(sessionId: string): Promise<ClarificationRequest[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT * FROM clarification_requests WHERE session_id = ? AND status = ? ORDER BY created_at ASC',
+    [sessionId, 'pending']
+  );
+  return rows as ClarificationRequest[];
+}
+
+export async function answerClarificationRequest(id: string, answer: string): Promise<void> {
+  const pool = getPool();
+  await pool.execute(
+    'UPDATE clarification_requests SET status = ?, answer = ?, answered_at = ? WHERE id = ?',
+    ['answered', answer, Date.now(), id]
+  );
+}
+
+// ─── Task with parent support ────────────────────────────────────────────────
+
+export async function getChildTasks(parentTaskId: string): Promise<Task[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY created_at ASC',
+    [parentTaskId]
+  );
+  return rows as Task[];
 }

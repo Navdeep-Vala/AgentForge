@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { useCallback, useMemo } from 'react';
-import { Session, Task, TaskComment, ChatMessage, TaskStatus, SessionStatus } from '../types';
+import { Session, Task, TaskComment, ChatMessage, SubAgent, ClarificationRequest, TaskStatus, SessionStatus } from '../types';
 import { useAppDispatch, useAppSelector } from './hooks';
 import type { RootState } from './store';
 
@@ -8,6 +8,9 @@ interface SessionState {
   currentSession: Session | null;
   comments: Record<string, TaskComment[]>; // keyed by task_id
   chatMessages: ChatMessage[];
+  subAgents: SubAgent[];
+  clarificationRequests: ClarificationRequest[];
+  childTasks: Record<string, string[]>; // keyed by parent_task_id
   isLoading: boolean;
   error: string | null;
 
@@ -26,6 +29,17 @@ interface SessionState {
   addChatMessage: (message: ChatMessage) => void;
   setChatMessages: (messages: ChatMessage[]) => void;
 
+  setSubAgents: (subAgents: SubAgent[]) => void;
+  addSubAgent: (subAgent: SubAgent) => void;
+
+  setClarificationRequests: (clarifications: ClarificationRequest[]) => void;
+  addClarificationRequest: (clarification: ClarificationRequest) => void;
+
+  updateSubAgentStatus: (subAgentId: string, status: SubAgent['status'], output?: string | null, thought?: string | null) => void;
+
+  addChildTask: (parentTaskId: string, childTaskId: string) => void;
+  setChildTasks: (parentTaskId: string, childTaskIds: string[]) => void;
+
   reset: () => void;
 }
 
@@ -33,6 +47,9 @@ interface SessionSliceState {
   currentSession: Session | null;
   comments: Record<string, TaskComment[]>;
   chatMessages: ChatMessage[];
+  subAgents: SubAgent[];
+  clarificationRequests: ClarificationRequest[];
+  childTasks: Record<string, string[]>;
   isLoading: boolean;
   error: string | null;
 }
@@ -41,6 +58,9 @@ const initialState: SessionSliceState = {
   currentSession: null,
   comments: {},
   chatMessages: [],
+  subAgents: [],
+  clarificationRequests: [],
+  childTasks: {},
   isLoading: false,
   error: null,
 };
@@ -121,6 +141,41 @@ const sessionSlice = createSlice({
     setChatMessages(state, action: PayloadAction<ChatMessage[]>) {
       state.chatMessages = action.payload;
     },
+    setSubAgents(state, action: PayloadAction<SubAgent[]>) {
+      state.subAgents = action.payload;
+    },
+    addSubAgent(state, action: PayloadAction<SubAgent>) {
+      state.subAgents.push(action.payload);
+    },
+    setClarificationRequests(state, action: PayloadAction<ClarificationRequest[]>) {
+      state.clarificationRequests = action.payload;
+    },
+    addClarificationRequest(state, action: PayloadAction<ClarificationRequest>) {
+      state.clarificationRequests.push(action.payload);
+    },
+    updateSubAgentStatus(
+      state,
+      action: PayloadAction<{ subAgentId: string; status: SubAgent['status']; output?: string | null; thought?: string | null }>
+    ) {
+      const { subAgentId, status, output, thought } = action.payload;
+      state.subAgents = state.subAgents.map((sa) =>
+        sa.id === subAgentId ? { ...sa, status, ...(output !== undefined ? { output } : {}), ...(thought !== undefined ? { thought } : {}) } : sa
+      );
+    },
+    addChildTask(state, action: PayloadAction<{ parentTaskId: string; childTaskId: string }>) {
+      const { parentTaskId, childTaskId } = action.payload;
+      const existing = state.childTasks[parentTaskId] ?? [];
+      state.childTasks = {
+        ...state.childTasks,
+        [parentTaskId]: [...existing, childTaskId],
+      };
+    },
+    setChildTasks(state, action: PayloadAction<{ parentTaskId: string; childTaskIds: string[] }>) {
+      state.childTasks = {
+        ...state.childTasks,
+        [action.payload.parentTaskId]: action.payload.childTaskIds,
+      };
+    },
     reset() {
       return initialState;
     },
@@ -139,6 +194,13 @@ export const {
   setComments,
   addChatMessage,
   setChatMessages,
+  setSubAgents,
+  addSubAgent,
+  setClarificationRequests,
+  addClarificationRequest,
+  updateSubAgentStatus,
+  addChildTask,
+  setChildTasks,
   reset,
 } = sessionSlice.actions;
 
@@ -214,6 +276,48 @@ export function useSessionStore(): SessionState {
     },
     [dispatch]
   );
+  const boundSetSubAgents = useCallback(
+    (subAgents: SubAgent[]) => {
+      dispatch(setSubAgents(subAgents));
+    },
+    [dispatch]
+  );
+  const boundAddSubAgent = useCallback(
+    (subAgent: SubAgent) => {
+      dispatch(addSubAgent(subAgent));
+    },
+    [dispatch]
+  );
+  const boundSetClarificationRequests = useCallback(
+    (clarifications: ClarificationRequest[]) => {
+      dispatch(setClarificationRequests(clarifications));
+    },
+    [dispatch]
+  );
+  const boundAddClarificationRequest = useCallback(
+    (clarification: ClarificationRequest) => {
+      dispatch(addClarificationRequest(clarification));
+    },
+    [dispatch]
+  );
+  const boundUpdateSubAgentStatus = useCallback(
+    (subAgentId: string, status: SubAgent['status'], output?: string | null, thought?: string | null) => {
+      dispatch(updateSubAgentStatus({ subAgentId, status, output, thought }));
+    },
+    [dispatch]
+  );
+  const boundAddChildTask = useCallback(
+    (parentTaskId: string, childTaskId: string) => {
+      dispatch(addChildTask({ parentTaskId, childTaskId }));
+    },
+    [dispatch]
+  );
+  const boundSetChildTasks = useCallback(
+    (parentTaskId: string, childTaskIds: string[]) => {
+      dispatch(setChildTasks({ parentTaskId, childTaskIds }));
+    },
+    [dispatch]
+  );
   const boundReset = useCallback(() => {
     dispatch(reset());
   }, [dispatch]);
@@ -232,6 +336,13 @@ export function useSessionStore(): SessionState {
       setComments: boundSetComments,
       addChatMessage: boundAddChatMessage,
       setChatMessages: boundSetChatMessages,
+      setSubAgents: boundSetSubAgents,
+      addSubAgent: boundAddSubAgent,
+      setClarificationRequests: boundSetClarificationRequests,
+      addClarificationRequest: boundAddClarificationRequest,
+      updateSubAgentStatus: boundUpdateSubAgentStatus,
+      addChildTask: boundAddChildTask,
+      setChildTasks: boundSetChildTasks,
       reset: boundReset,
     }),
     [
@@ -247,6 +358,12 @@ export function useSessionStore(): SessionState {
       boundSetComments,
       boundAddChatMessage,
       boundSetChatMessages,
+      boundSetSubAgents,
+      boundAddSubAgent,
+      boundSetClarificationRequests,
+      boundAddClarificationRequest,
+      boundAddChildTask,
+      boundSetChildTasks,
       boundReset,
     ]
   );

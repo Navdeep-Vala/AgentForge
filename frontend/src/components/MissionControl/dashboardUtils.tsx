@@ -7,7 +7,7 @@ import {
   Sparkles,
   type LucideIcon,
 } from 'lucide-react';
-import type { AgentDefinition, ChatMessage, Session, Task, TaskComment } from '../../types';
+import type { AgentDefinition, ChatMessage, Session, Task, TaskComment, SubAgent } from '../../types';
 
 export const USER_HANDLE = 'navdeep';
 
@@ -206,6 +206,14 @@ export function getMentionedTaskIds(comments: Record<string, TaskComment[]>): st
       taskCommentsForTask.some((comment) => extractMentions(comment.content).includes(USER_HANDLE))
     )
     .map(([taskId]) => taskId);
+}
+
+export function getTaskSubAgents(taskId: string, subAgents: SubAgent[]): SubAgent[] {
+  return subAgents.filter((sa) => sa.task_id === taskId);
+}
+
+export function getTaskNeedsApproval(task: Task): boolean {
+  return task.status === 'needs_approval';
 }
 
 export function getUserMentions(messages: ChatMessage[], comments: Record<string, TaskComment[]>): Array<{

@@ -88,7 +88,7 @@ Respond in one of these two formats ONLY:
 Format 1 (if you have something to say):
 COMMENT_TYPE: [insight | review | refute | praise | question]
 CONTENT:
-[Your markdown commentary here. Be specific. Reference their work directly.]
+[Your concise markdown commentary. If there is a mistake, start by mentioning the agent (e.g., @Coder). Be direct: "The output is wrong because X." No need for long explanations or verifying incorrect code. Just state the mistake and what is needed.]
 
 Format 2 (if you have nothing to add):
 NO_COMMENT`;

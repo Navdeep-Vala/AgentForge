@@ -149,4 +149,57 @@ export const AGENT_TOOLS: ToolDefinition[] = [
       required: ['summary'],
     },
   },
+  {
+    name: 'spawn_sub_agent',
+    description: 'Spawn a specialized sub-agent to handle a sub-task in parallel. Use this when the task can be broken into independent smaller tasks that can run concurrently. Available sub-agent types: file_checker, error_checker, test_runner, code_reviewer, security_auditor. After all sub-agents complete, aggregate their results.',
+    parameters: {
+      type: 'object',
+      properties: {
+        sub_agent_type: { type: 'string', description: 'Type of sub-agent: file_checker | error_checker | test_runner | code_reviewer | security_auditor' },
+        title: { type: 'string', description: 'Title of the sub-task' },
+        description: { type: 'string', description: 'Detailed instructions for the sub-agent' },
+      },
+      required: ['sub_agent_type', 'title', 'description'],
+    },
+  },
+  {
+    name: 'spawn_specialized_agent',
+    description: 'Create and delegate work to a new specialized agent that does not currently exist in the team. Use this when the task requires a very specific domain expertise (e.g., database migration specialist, accessibility auditor, internationalization expert, performance profiler) that is not covered by any existing built-in agent. The system will automatically provision this agent for you. Use with sub_agents_to_spawn to define parallel sub-agent work.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agent_type: { type: 'string', description: 'Unique name for the new specialized agent type (e.g., "db_migration_specialist", "a11y_auditor")' },
+        title: { type: 'string', description: 'Title for the specialized agent task' },
+        description: { type: 'string', description: 'Detailed instructions for the specialized agent' },
+        sub_agents_to_spawn: { type: 'array', description: 'Optional list of sub-agent types to spawn in parallel (e.g., ["file_checker", "error_checker"])', items: { type: 'string' } },
+      },
+      required: ['agent_type', 'title', 'description'],
+    },
+  },
+  {
+    name: 'request_clarification',
+    description: 'Pause execution and ask the user (navdeep) for clarification or additional information needed to proceed. Use this when the task is ambiguous, requirements are unclear, or critical information is missing. The task will remain paused until the user responds.',
+    parameters: {
+      type: 'object',
+      properties: {
+        question: { type: 'string', description: 'The specific question or clarification needed from the user' },
+        context: { type: 'string', description: 'Additional context about what was already done or what is unclear' },
+        options: { type: 'array', description: 'Suggested options for the user to choose from (optional)', items: { type: 'string' } },
+      },
+      required: ['question'],
+    },
+  },
+  {
+    name: 'request_approval',
+    description: 'Submit completed work for review and request user approval before proceeding (e.g., before committing code). The task will enter a "needs_approval" state and wait for the user to review and approve or request changes.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Title of the work being submitted for approval' },
+        summary: { type: 'string', description: 'Summary of what was done and what is being submitted for review' },
+        files_changed: { type: 'string', description: 'Description of files changed or created' },
+      },
+      required: ['title', 'summary'],
+    },
+  },
 ];

@@ -90,22 +90,22 @@ function AgentRow({
         selected ? 'bg-[var(--app-col)]' : 'hover:bg-[var(--app-col)]/70'
       }`}
     >
-      <div className="grid h-12 w-12 place-items-center rounded-[16px] border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[var(--app-shadow-card)]">
+      <div className="grid h-12 w-12 shrink-0 place-items-center rounded-[16px] border border-[var(--app-border)] bg-[var(--app-surface)] shadow-[var(--app-shadow-card)]">
         <Icon size={20} style={{ color: agent.color }} />
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className="truncate text-[16px] font-semibold tracking-[-0.02em] text-[var(--app-text)]">{agent.name}</p>
-          <span className="rounded-[10px] border border-[var(--app-accent)]/20 bg-[var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--app-accent)]">
+        <div className="flex items-center gap-1.5 overflow-hidden">
+          <p className="truncate text-[15px] font-semibold tracking-[-0.02em] text-[var(--app-text)] leading-tight">{agent.name}</p>
+          <span className="shrink-0 rounded-[8px] border border-[var(--app-accent)]/20 bg-[var(--app-accent-soft)] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--app-accent)]">
             {agent.badge}
           </span>
         </div>
-        <p className="mt-0.5 truncate text-[13px] text-[var(--app-sub)]">{agent.shortRole}</p>
+        <p className="mt-0.5 truncate text-[12px] text-[var(--app-sub)]">{agent.shortRole}</p>
       </div>
 
-      <div className={`flex items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.14em] ${statusColor}`}>
-        <span className={`h-2.5 w-2.5 rounded-full ${status === 'working' ? 'bg-[#38a772]' : status === 'waiting' ? 'bg-[#d8a14a]' : 'bg-[#d3ccc2]'}`} />
+      <div className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.1em] ${statusColor}`}>
+        <span className={`h-2 w-2 rounded-full ${status === 'working' ? 'bg-[#38a772]' : status === 'waiting' ? 'bg-[#d8a14a]' : 'bg-[#d3ccc2]'}`} />
         {statusText}
       </div>
     </button>

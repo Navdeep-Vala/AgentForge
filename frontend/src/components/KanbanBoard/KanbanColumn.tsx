@@ -11,7 +11,7 @@ interface KanbanColumnProps {
 
 export function KanbanColumn({ title, dotColor, tasks, comments, onOpenTask }: KanbanColumnProps) {
   return (
-    <section className="min-w-[250px] flex-1 border-r border-[var(--app-border)] last:border-r-0">
+    <section className="min-w-[280px] flex-1 border-r border-[var(--app-border)] last:border-r-0">
       <div className="flex items-center gap-2.5 border-b border-[var(--app-border)] px-4 py-3">
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: dotColor }} />
         <span className="text-[13px] font-semibold uppercase tracking-[0.14em] text-[var(--app-sub)]">{title}</span>

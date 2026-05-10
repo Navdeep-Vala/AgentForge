@@ -175,12 +175,14 @@ async function runScheduledHeartbeat(sessionId: string, sessionGoal: string, dis
       description: plan.description,
       status: 'todo',
       output: null,
+      thought: null,
       tokens_used: 0,
       model_used: null,
       spawned_by_agent: plan.spawned_by,
       started_at: null,
       completed_at: null,
       created_at: Date.now(),
+      parent_task_id: null,
     };
 
     await createTask(spawnedTask);

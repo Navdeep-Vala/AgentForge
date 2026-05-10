@@ -105,7 +105,10 @@ export function AgentManager({ onClose }: AgentManagerProps) {
   const inputClass = "bg-app-col border border-app-border rounded px-3 py-2 text-sm text-app-text placeholder:text-app-muted focus:outline-hidden focus:border-app-sub transition-colors w-full";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
       <div className="bg-app-surface border border-app-border rounded-xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-card-md">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-app-border">

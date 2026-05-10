@@ -13,6 +13,8 @@ export function useSession() {
     reset,
     setComments,
     setChatMessages,
+    setSubAgents,
+    setClarificationRequests,
   } = useSessionStore();
   const { agentOverrides } = useModelStore();
   const { clearEvents } = useFeedStore();
@@ -54,22 +56,24 @@ export function useSession() {
     setError(null);
     clearEvents();
     try {
-      const { session, comments, chatMessages } = await getSession(id);
+const { session, comments, chatMessages, subAgents, clarificationRequests } = await getSession(id);
 
       setCurrentSession(session);
 
       // Group comments by task_id
       const commentMap: Record<string, any[]> = {};
-      comments.forEach(c => {
+      comments.forEach((c: any) => {
         if (!commentMap[c.task_id]) commentMap[c.task_id] = [];
         commentMap[c.task_id].push(c);
       });
-      
+
       Object.entries(commentMap).forEach(([taskId, taskComments]) => {
         setComments(taskId, taskComments);
       });
-      
+
       setChatMessages(chatMessages);
+      setSubAgents(subAgents ?? []);
+      setClarificationRequests(clarificationRequests ?? []);
 
       // If the session is cancelled with no tasks, surface the error
       if (session.status === 'cancelled' && (!session.tasks || session.tasks.length === 0)) {
@@ -80,7 +84,7 @@ export function useSession() {
     } finally {
       setLoading(false);
     }
-  }, [clearEvents, setChatMessages, setComments, setCurrentSession, setError, setLoading]);
+  }, [clearEvents, setChatMessages, setComments, setCurrentSession, setError, setLoading, setSubAgents, setClarificationRequests]);
 
   const stopSession = useCallback(async (id: string): Promise<void> => {
     try {

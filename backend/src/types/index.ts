@@ -1,6 +1,12 @@
 export type SessionStatus = 'pending' | 'running' | 'completed' | 'cancelled' | 'failed';
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled';
-export type CommentType = 'insight' | 'review' | 'refute' | 'praise' | 'question';
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled' | 'needs_approval' | 'waiting_for_predecessor';
+export type CommentType = 'insight' | 'review' | 'refute' | 'praise' | 'question' | 'clarification';
+
+export const SUB_AGENT_TYPES = ['file_checker', 'error_checker', 'test_runner', 'code_reviewer', 'security_auditor'] as const;
+export type SubAgentType = (typeof SUB_AGENT_TYPES)[number];
+
+export const SPECIALIZED_AGENT_TYPES = ['analyzer', 'designer', 'data_engineer', 'devops', 'security_expert', 'performance_engineer'] as const;
+export type SpecializedAgentType = (typeof SPECIALIZED_AGENT_TYPES)[number];
 
 export interface Project {
   id: string;
@@ -58,12 +64,14 @@ export interface Task {
   description: string;
   status: TaskStatus;
   output: string | null;
+  thought: string | null;
   tokens_used: number;
   model_used: string | null;
   spawned_by_agent: string | null;
   started_at: number | null;
   completed_at: number | null;
   created_at: number;
+  parent_task_id: string | null;
 }
 
 export interface TaskComment {
@@ -112,11 +120,51 @@ export interface CustomAgent {
 }
 
 export interface ManagerTaskPlan {
+  thought: string;
   tasks: Array<{
     agent_type: string;
     title: string;
     description: string;
   }>;
+}
+
+// ─── Sub-Agent Delegation ────────────────────────────────────────────────────
+
+export interface SubAgent {
+  id: string;
+  task_id: string;
+  session_id: string;
+  sub_agent_type: SubAgentType;
+  title: string;
+  description: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  output: string | null;
+  thought?: string | null;
+  started_at: number | null;
+  completed_at: number | null;
+  created_at: number;
+}
+
+// ─── Clarification Requests ──────────────────────────────────────────────────
+
+export interface ClarificationRequest {
+  id: string;
+  session_id: string;
+  task_id: string;
+  agent_type: string;
+  agent_name: string;
+  question: string;
+  context: string | null;
+  options: string[] | null;
+  answer?: string | null;
+  status: 'pending' | 'answered' | 'expired';
+  created_at: number;
+  answered_at: number | null;
+}
+
+export interface ClarificationResponse {
+  clarification_id: string;
+  answer: string;
 }
 
 // ─── SSE Events ───────────────────────────────────────────────────────────────
@@ -125,7 +173,7 @@ export interface SSETaskCreatedEvent {
   type: 'task_created';
   task: {
     id: string;
-    status: 'todo';
+    status: TaskStatus;
     agent_type: string;
     agent_name: string;
     title: string;
@@ -147,8 +195,9 @@ export interface SSETaskCompleteEvent {
   type: 'task_complete';
   task: {
     id: string;
-    status: 'done';
+    status: TaskStatus;
     output: string | null;
+    thought: string | null;
     tokens_used: number;
     model_used: string | null;
     completed_at: number;
@@ -250,6 +299,68 @@ export interface SSEFileChangedEvent {
   changeType: 'created' | 'modified' | 'deleted';
 }
 
+export interface SSENeedsApprovalEvent {
+  type: 'needs_approval';
+  taskId: string;
+  agentType: string;
+  agentName: string;
+  title: string;
+  output: string;
+  notify?: boolean;
+}
+
+export interface SSESubAgentEvent {
+  type: 'sub_agent_spawned' | 'sub_agent_complete' | 'sub_agent_failed';
+  taskId: string;
+  subAgentId: string;
+  subAgentType: string;
+  title: string;
+  output?: string;
+  thought?: string;
+}
+
+export interface SSEClarificationRequestEvent {
+  type: 'clarification_request';
+  requestId: string;
+  taskId: string;
+  agentType: string;
+  agentName: string;
+  question: string;
+  context: string | null;
+  options: string[] | null;
+  notify?: boolean;
+}
+
+export interface SSEClarificationResponseEvent {
+  type: 'clarification_response';
+  requestId: string;
+  taskId: string;
+  response: string;
+}
+
+export interface SSEApprovalResponseEvent {
+  type: 'approval_response';
+  taskId: string;
+  approved: boolean;
+  feedback: string;
+}
+
+export interface SSEFileChangedEvent {
+  type: 'file_changed';
+  sessionId: string;
+  taskId: string;
+  filePath: string;
+  changeType: 'created' | 'modified' | 'deleted';
+}
+
+export interface SSESpecializedAgentSpawnedEvent {
+  type: 'specialized_agent_spawned';
+  taskId: string;
+  agentType: string;
+  agentName: string;
+  description: string;
+}
+
 export type SSEEvent =
   | SSETaskCreatedEvent
   | SSETaskClaimedEvent
@@ -267,7 +378,13 @@ export type SSEEvent =
   | SSEManagerWorkingEvent
   | SSEAgentToolUseEvent
   | SSEAgentToolResultEvent
-  | SSEFileChangedEvent;
+  | SSEFileChangedEvent
+  | SSENeedsApprovalEvent
+  | SSESubAgentEvent
+  | SSEClarificationRequestEvent
+  | SSEClarificationResponseEvent
+  | SSEApprovalResponseEvent
+  | SSESpecializedAgentSpawnedEvent;
 
 // ─── Model / OpenRouter ───────────────────────────────────────────────────────
 

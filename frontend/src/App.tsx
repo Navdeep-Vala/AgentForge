@@ -15,12 +15,14 @@ import { TaskDetailModal } from "./components/TaskDetail/TaskDetailModal";
 import {
   MentionToasts,
   type MentionToast,
+  type ClarificationToast,
+  type ApprovalToast,
 } from "./components/Notifications/MentionToasts";
 import { useSession } from "./hooks/useSession";
 import { useSSE } from "./hooks/useSSE";
 import { useSessionStore } from "./store/sessionStore";
 import { useThemeStore } from "./store/themeStore";
-import type { Task } from "./types";
+import type { Session, Task, SubAgent, ClarificationRequest } from "./types";
 import {
   getAgentCatalog,
   getUserMentions,
@@ -40,8 +42,10 @@ export default function App() {
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
   const [toasts, setToasts] = useState<MentionToast[]>([]);
+  const [clarificationToasts, setClarificationToasts] = useState<ClarificationToast[]>([]);
+  const [approvalToasts, setApprovalToasts] = useState<ApprovalToast[]>([]);
 
-  const { currentSession, chatMessages, comments } = useSessionStore();
+  const { currentSession, chatMessages, comments, clarificationRequests } = useSessionStore();
   const { startSession, stopSession } = useSession();
   const { theme } = useThemeStore();
   const { agents } = useAgentStore();
@@ -51,10 +55,24 @@ export default function App() {
 
   useEffect(() => {
     const root = document.documentElement;
-    theme === "dark"
-      ? root.classList.add("dark")
-      : root.classList.remove("dark");
+    if (theme === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
   }, [theme]);
+
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  const showNotification = (title: string, body: string) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, { body, icon: "/logo.png" });
+    }
+  };
 
   const agentCatalog = useMemo(
     () => getAgentCatalog(agents, currentSession),
@@ -78,6 +96,8 @@ export default function App() {
       };
 
       setToasts((current) => [toast, ...current].slice(0, 4));
+      showNotification(toast.title, toast.body);
+      
       window.setTimeout(() => {
         setToasts((current) =>
           current.filter((item) => item.id !== mention.id),
@@ -85,6 +105,69 @@ export default function App() {
       }, 8000);
     }
   }, [userMentions]);
+
+  // Handle clarification requests as toasts
+  useEffect(() => {
+    if (!clarificationRequests) return;
+    const pendingRequests = clarificationRequests.filter((c) => c.status === 'pending');
+    for (const req of pendingRequests) {
+      if (mentionSourceRef.current.has(`clar-${req.id}`)) continue;
+      mentionSourceRef.current.add(`clar-${req.id}`);
+
+      const toast = {
+        id: `clar-${req.id}`,
+        title: `${req.agent_name ? req.agent_name : 'Agent'} needs clarification`,
+        body: req.question.slice(0, 140),
+      };
+
+      setClarificationToasts((current) => [toast, ...current].slice(0, 4));
+      showNotification(toast.title, toast.body);
+
+      window.setTimeout(() => {
+        setClarificationToasts((current) =>
+          current.filter((item) => item.id !== `clar-${req.id}`),
+        );
+      }, 15000);
+    }
+  }, [clarificationRequests]);
+
+  // Handle approval responses as toasts
+  useEffect(() => {
+    if (!currentSession?.tasks) return;
+    const tasks = currentSession.tasks as (Task & { status: string })[];
+    for (const task of tasks) {
+      if (task.status === 'done' && !mentionSourceRef.current.has(`approval-${task.id}`)) {
+        // Check if this was recently approved (transitioned from needs_approval to done)
+        if (['coder', 'tester'].includes(task.agent_type)) {
+          mentionSourceRef.current.add(`approval-${task.id}`);
+          const toast: ApprovalToast = {
+            id: `approval-${task.id}`,
+            title: `${task.agent_name} task approved`,
+            body: `"${task.title}" has been completed and approved.`,
+          };
+          setApprovalToasts((current) => [toast, ...current].slice(0, 4));
+          window.setTimeout(() => {
+            setApprovalToasts((current) =>
+              current.filter((item) => item.id !== `approval-${task.id}`),
+            );
+          }, 10000);
+        }
+      }
+    }
+  }, [currentSession?.tasks]);
+
+  const selectedAgentSubAgentIds = useMemo(() => {
+    if (!currentSession || !selectedAgent) return [];
+    const session = currentSession as Session & { subAgents?: SubAgent[] };
+    if (!session.subAgents) return [];
+    return session.subAgents
+      .filter((sa) =>
+        (currentSession.tasks ?? []).some(
+          (t) => t.agent_type === selectedAgent.type && t.id === sa.task_id
+        )
+      )
+      .map((sa) => sa.id);
+  }, [currentSession, selectedAgent]);
 
   const handleLaunchMission = async (goal: string) => {
     await startSession(
@@ -117,7 +200,7 @@ export default function App() {
         onOpenBroadcast={() => setBroadcastOpen(true)}
         onOpenDocs={() => setDocsOpen(true)}
         onPause={handlePause}
-        mentionCount={userMentions.length}
+        mentionCount={userMentions.length + clarificationRequests.filter((c: ClarificationRequest) => c.status === 'pending').length + approvalToasts.length}
       />
 
       <div className="flex h-[calc(100vh-72px)] overflow-hidden">
@@ -133,6 +216,9 @@ export default function App() {
         <TaskDetailModal
           task={selectedTask}
           comments={comments}
+          subAgents={(currentSession as any).subAgents ?? []}
+          clarificationRequests={clarificationRequests}
+          childTasks={[]}
           onClose={() => setSelectedTask(null)}
         />
       )}
@@ -144,6 +230,7 @@ export default function App() {
           tasks={currentSession?.tasks ?? []}
           comments={comments}
           chatMessages={chatMessages}
+          subAgentIds={selectedAgentSubAgentIds}
           onClose={() => setSelectedAgent(null)}
           onOpenTask={setSelectedTask}
           onLaunchMission={handleLaunchMission}
@@ -173,9 +260,13 @@ export default function App() {
 
       <MentionToasts
         toasts={toasts}
-        onDismiss={(id) =>
-          setToasts((current) => current.filter((toast) => toast.id !== id))
-        }
+        clarificationToasts={clarificationToasts}
+        approvalToasts={approvalToasts}
+        onDismiss={(id) => {
+          setToasts((current) => current.filter((toast) => toast.id !== id));
+          setClarificationToasts((current) => current.filter((toast) => toast.id !== id));
+          setApprovalToasts((current) => current.filter((toast) => toast.id !== id));
+        }}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Session, SessionSummary, AgentDefinition, TaskComment, ChatMessage } from '../types';
+import { Session, SessionSummary, AgentDefinition, TaskComment, ChatMessage, SubAgent, ClarificationRequest } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001';
 
@@ -28,8 +28,20 @@ export async function listSessions(): Promise<SessionSummary[]> {
   return res.data.sessions;
 }
 
-export async function getSession(id: string): Promise<{ session: Session; comments: TaskComment[]; chatMessages: any[] }> {
-  const res = await api.get<{ session: Session; comments: TaskComment[]; chatMessages: any[] }>(`/sessions/${id}`);
+export async function getSession(id: string): Promise<{ 
+  session: Session; 
+  comments: TaskComment[]; 
+  chatMessages: any[]; 
+  subAgents: SubAgent[]; 
+  clarificationRequests: ClarificationRequest[]; 
+}> {
+  const res = await api.get<{ 
+    session: Session; 
+    comments: TaskComment[]; 
+    chatMessages: any[]; 
+    subAgents: SubAgent[]; 
+    clarificationRequests: ClarificationRequest[]; 
+  }>(`/sessions/${id}`);
   return res.data;
 }
 
@@ -124,6 +136,10 @@ export async function testApiKey(provider: string, api_key: string): Promise<{ v
 
 export async function deleteApiKey(provider: string): Promise<void> {
   await api.delete(`/models/keys/${provider}`);
+}
+
+export async function approveTask(taskId: string, approved: boolean, feedback?: string): Promise<void> {
+  await api.post(`/tasks/${taskId}/approve`, { approved, feedback });
 }
 
 export function getSseUrl(sessionId: string): string {

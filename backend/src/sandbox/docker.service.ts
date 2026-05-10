@@ -1,4 +1,4 @@
-import Docker from 'dockerode';
+import Docker, { Container } from 'dockerode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -11,7 +11,7 @@ export interface SandboxConfig {
 
 export class DockerService {
   private docker: Docker;
-  private containers: Map<string, Docker.Container>; // sessionId -> container
+  private containers: Map<string, Container>; // sessionId -> container
 
   constructor() {
     this.docker = new Docker();
@@ -46,7 +46,7 @@ export class DockerService {
 
     await container.start();
     this.containers.set(config.containerName, container);
-    return container.id;
+    return (container as any).id;
   }
 
   async startSandbox(containerId: string): Promise<void> {

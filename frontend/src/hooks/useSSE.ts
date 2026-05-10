@@ -26,6 +26,11 @@ export function useSSE(sessionId: string | null): void {
     setCurrentSession,
     addComment,
     addChatMessage,
+    addSubAgent,
+    addClarificationRequest,
+    setClarificationRequests,
+    clarificationRequests,
+    updateSubAgentStatus,
   } = useSessionStore();
   const { addEvent } = useFeedStore();
   const esRef = useRef<EventSource | null>(null);
@@ -121,6 +126,7 @@ export function useSSE(sessionId: string | null): void {
         case 'task_complete':
           updateTaskStatus(msg.task.id, 'done', {
             output: msg.task.output,
+            thought: msg.task.thought,
             tokens_used: msg.task.tokens_used,
             model_used: msg.task.model_used,
             completed_at: msg.task.completed_at,
@@ -172,7 +178,11 @@ export function useSSE(sessionId: string | null): void {
 
         case 'connected':
           break;
-        
+
+        case 'session_status_changed':
+          setSessionStatus(msg.status);
+          break;
+
         case 'manager_working':
           addEvent({
             type: 'manager_working',
@@ -181,16 +191,105 @@ export function useSSE(sessionId: string | null): void {
           });
           break;
 
-        case 'session_status_changed':
-          setSessionStatus(msg.status);
-          break;
-
         case 'agent_thinking':
           addEvent({
-            type: 'manager_working', // Reuse config or add new
+            type: 'manager_working',
             message: msg.message,
             agentName: msg.agentName,
             agentColor: getAgentColor(msg.agentType),
+          });
+          break;
+
+        case 'sub_agent_spawned':
+          addSubAgent(msg.subAgent);
+          addEvent({
+            type: 'sub_agent_started',
+            message: `Sub-agent started: ${msg.subAgent.title}`,
+            agentName: msg.subAgent.title,
+            agentColor: getAgentColor(msg.subAgent.sub_agent_type),
+          });
+          break;
+
+        case 'sub_agent_complete':
+          updateSubAgentStatus(msg.subAgentId, 'completed', msg.output, msg.thought);
+          addEvent({
+            type: 'sub_agent_complete',
+            message: `Sub-agent completed: ${msg.subAgentId}`,
+            agentColor: '#10B981',
+          });
+          break;
+
+        case 'sub_agent_failed':
+          addEvent({
+            type: 'sub_agent_failed',
+            message: msg.error,
+            agentColor: '#EF4444',
+          });
+          break;
+
+        case 'clarification_request':
+          addClarificationRequest(msg.clarification);
+          addEvent({
+            type: 'clarification_request',
+            message: `Clarification needed: ${msg.clarification.question}`,
+            agentName: msg.clarification.agent_name,
+            agentColor: getAgentColor(msg.clarification.agent_type),
+          });
+          break;
+
+        case 'clarification_response':
+          setClarificationRequests(
+            clarificationRequests.map((c) =>
+              c.id === msg.clarificationId
+                ? { ...c, status: 'answered', response: msg.response, responded_at: Date.now() }
+                : c
+            )
+          );
+          addEvent({
+            type: 'clarification_response',
+            message: `Clarified: ${msg.response}`,
+            agentName: msg.answeredBy.agent_name,
+            agentColor: getAgentColor(msg.answeredBy.agent_type),
+          });
+          break;
+
+        case 'needs_approval':
+          updateTaskStatus(msg.taskId, 'needs_approval');
+          addEvent({
+            type: 'approval_requested',
+            message: `Approval needed for: ${msg.details?.title || msg.taskId}`,
+            agentName: 'System',
+            agentColor: '#F59E0B',
+          });
+          break;
+
+        case 'approval_response':
+          updateTaskStatus(msg.taskId, msg.approved ? 'done' : 'in_progress');
+          addEvent({
+            type: 'approval_result',
+            message: msg.approved
+              ? `Task approved by navdeep`
+              : `Task changes requested: ${msg.feedback}`,
+            agentName: 'navdeep',
+            agentColor: msg.approved ? '#10B981' : '#EF4444',
+          });
+          break;
+
+        case 'specialized_agent_spawned':
+          addEvent({
+            type: 'specialized_agent_spawned',
+            message: `Specialized agent spawned: ${msg.agentName} (${msg.agentType})`,
+            agentName: msg.agentName,
+            agentColor: '#8B5CF6',
+          });
+          break;
+
+        case 'file_changed':
+          addEvent({
+            type: 'file_changed',
+            message: `${msg.changeType === 'created' ? 'File created' : 'File deleted'}: ${msg.filePath}`,
+            agentName: 'System',
+            agentColor: '#6366F1',
           });
           break;
 

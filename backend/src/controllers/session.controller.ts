@@ -7,6 +7,8 @@ import {
   getTasksBySessionId,
   getCommentsBySessionId,
   getChatMessagesBySessionId,
+  getSubAgentsBySessionId,
+  getClarificationRequestsBySessionId,
   createChatMessage,
 } from '../db/queries';
 import { startSession, cancelSession } from '../orchestrator/orchestrator';
@@ -79,12 +81,14 @@ export async function getSessionHandler(
       return;
     }
 
-    const [tasks, comments, chatMessages] = await Promise.all([
+    const [tasks, comments, chatMessages, allSubAgents, allClarifications] = await Promise.all([
       getTasksBySessionId(session.id),
       getCommentsBySessionId(session.id),
       getChatMessagesBySessionId(session.id),
+      getSubAgentsBySessionId(session.id),
+      getClarificationRequestsBySessionId(session.id),
     ]);
-    res.json({ session: { ...session, tasks }, comments, chatMessages });
+    res.json({ session: { ...session, tasks }, comments, chatMessages, subAgents: allSubAgents, clarificationRequests: allClarifications });
   } catch (err) {
     next(err);
   }

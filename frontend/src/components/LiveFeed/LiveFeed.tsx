@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { useFeedStore } from '../../store/feedStore';
 import { useSessionStore } from '../../store/sessionStore';
 import { formatTimeAgo, getUserMentions } from '../MissionControl/dashboardUtils';
+import { MentionText } from '../Notifications/MentionText';
 
 type FeedFilter = 'all' | 'tasks' | 'comments' | 'docs' | 'status';
 
@@ -107,10 +108,13 @@ export function LiveFeed() {
                 <div className="flex items-start gap-3">
                   <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--app-muted)]" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-semibold leading-6 text-[var(--app-text)]">
-                      {item.agent}: {item.content}
+                    <p className="text-[14px] font-semibold leading-tight text-[var(--app-text)]">
+                      {item.agent}
                     </p>
-                    <p className="mt-3 text-[11px] uppercase tracking-[0.14em] text-[var(--app-muted)]">{formatTimeAgo(item.created_at)}</p>
+                    <div className="mt-1.5 text-[13px] leading-relaxed text-[var(--app-sub)]">
+                      <MentionText content={item.content} />
+                    </div>
+                    <p className="mt-3 text-[10px] uppercase tracking-[0.14em] text-[var(--app-muted)] font-bold">{formatTimeAgo(item.created_at)}</p>
                   </div>
                 </div>
               </article>

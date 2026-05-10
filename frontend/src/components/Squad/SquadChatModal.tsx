@@ -1,8 +1,10 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, useRef, useEffect, type ReactNode } from 'react';
 import { Loader2, Send, X } from 'lucide-react';
 import { addSessionChatMessage } from '../../api/client';
 import type { ChatMessage } from '../../types';
 import { formatTimeAgo } from '../MissionControl/dashboardUtils';
+import { MentionAutocomplete } from '../Notifications/MentionAutocomplete';
+import { MentionText } from '../Notifications/MentionText';
 
 interface SquadChatModalProps {
   sessionId: string | null;
@@ -13,7 +15,14 @@ interface SquadChatModalProps {
 export function SquadChatModal({ sessionId, messages, onClose }: SquadChatModalProps) {
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
+  
   const orderedMessages = useMemo(() => [...messages].sort((a, b) => a.created_at - b.created_at), [messages]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [orderedMessages]);
 
   const handleSubmit = async () => {
     const content = draft.trim();
@@ -31,9 +40,18 @@ export function SquadChatModal({ sessionId, messages, onClose }: SquadChatModalP
     }
   };
 
+  const handleMentionSelect = (agentName: string) => {
+    const lastAt = draft.lastIndexOf('@');
+    if (lastAt !== -1) {
+      const newDraft = draft.slice(0, lastAt) + `@${agentName} ` + draft.slice(draft.indexOf(' ', lastAt) !== -1 ? draft.indexOf(' ', lastAt) : draft.length);
+      setDraft(newDraft);
+      textAreaRef.current?.focus();
+    }
+  };
+
   return (
     <Shell title="Squad Chat" onClose={onClose}>
-      <div className="max-h-[58vh] space-y-3 overflow-y-auto pr-2">
+      <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-2 custom-scrollbar">
         {orderedMessages.length === 0 ? (
           <p className="rounded-[18px] border border-dashed border-[var(--app-border)] bg-[var(--app-surface)] px-5 py-6 text-center text-[13px] text-[var(--app-muted)]">
             Squad chat is quiet right now.
@@ -50,14 +68,23 @@ export function SquadChatModal({ sessionId, messages, onClose }: SquadChatModalP
                   <p className="text-[11px] text-[var(--app-muted)]">{formatTimeAgo(message.created_at)}</p>
                 </div>
               </div>
-              <p className="mt-3 whitespace-pre-wrap text-[14px] leading-6 text-[var(--app-sub)]">{message.content}</p>
+              <div className="mt-3 whitespace-pre-wrap text-[14px] leading-6 text-[var(--app-sub)]">
+                <MentionText content={message.content} />
+              </div>
             </article>
           ))
         )}
+        <div ref={messagesEndRef} />
       </div>
 
-      <div className="mt-5 rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] p-3">
+      <div className="relative mt-5 rounded-[20px] border border-[var(--app-border)] bg-[var(--app-surface)] p-3 shadow-sm">
+        <MentionAutocomplete 
+          text={draft} 
+          onSelect={handleMentionSelect} 
+          containerRef={textAreaRef}
+        />
         <textarea
+          ref={textAreaRef}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder="Message the squad... Use @name to direct a teammate."
@@ -178,15 +205,23 @@ export function DocsModal({ onClose }: { onClose: () => void }) {
 
 function Shell({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/20 backdrop-blur-[2px] p-4">
-      <div className="w-full max-w-3xl rounded-[24px] border border-[var(--app-border)] bg-[var(--app-surface)] p-5 shadow-2xl">
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-[var(--app-text)]">{title}</h2>
-          <button onClick={onClose} className="rounded-full p-2 text-[var(--app-muted)] transition hover:bg-[var(--app-col)] hover:text-[var(--app-text)]">
-            <X size={18} />
-          </button>
+    <div 
+      className="fixed inset-0 z-50 grid place-items-center bg-black/20 backdrop-blur-[2px] p-4"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="w-full max-w-3xl rounded-[32px] border border-[var(--app-border)] bg-[var(--app-surface)] p-2 shadow-2xl overflow-hidden">
+        <div className="bg-[var(--app-col)] rounded-[28px] p-6">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-[var(--app-text)]">{title}</h2>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--app-muted)] mt-1">Internal Agent Communications Hub</p>
+            </div>
+            <button onClick={onClose} className="rounded-full bg-[var(--app-surface)] p-2 text-[var(--app-muted)] shadow-sm transition hover:text-[var(--app-text)]">
+              <X size={18} />
+            </button>
+          </div>
+          {children}
         </div>
-        {children}
       </div>
     </div>
   );
