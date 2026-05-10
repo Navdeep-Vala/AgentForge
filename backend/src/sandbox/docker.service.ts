@@ -1,6 +1,7 @@
 import Docker, { Container } from 'dockerode';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { homeWorkspaceService } from '../services/home-workspace.service';
 
 export interface SandboxConfig {
   workspacePath: string;  // Host path to workspace directory
@@ -21,6 +22,7 @@ export class DockerService {
   async createSandbox(config: SandboxConfig): Promise<string> {
     // 1. Ensure workspace exists on host
     await fs.mkdir(config.workspacePath, { recursive: true });
+    const homePath = homeWorkspaceService.getHomePath();
 
     // 2. Create container with volume mount
     const container = await this.docker.createContainer({
@@ -30,7 +32,10 @@ export class DockerService {
       AttachStderr: true,
       Tty: false,
       HostConfig: {
-        Binds: [`${config.workspacePath}:/workspace`],
+        Binds: [
+          `${config.workspacePath}:/workspace`,
+          `${homePath}:/home/agent/home`
+        ],
         Memory: (config.memoryLimit ?? 1024) * 1024 * 1024, // Default 1GB
         CpuPeriod: 100000,
         CpuQuota: Math.round((config.cpuLimit ?? 1.0) * 100000), // Default 1.0 CPU

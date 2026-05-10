@@ -28,7 +28,8 @@ async function callOpenAI(
   model: string,
   messages: OpenRouterMessage[],
   maxTokens: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  tools?: any[]
 ): Promise<OpenRouterCallResult> {
   const modelId = model.replace(/^openai\//, '');
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -37,7 +38,12 @@ async function callOpenAI(
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ model: modelId, messages, max_tokens: maxTokens }),
+    body: JSON.stringify({ 
+      model: modelId, 
+      messages, 
+      max_tokens: maxTokens,
+      tools: tools?.length ? tools.map(t => ({ type: 'function', function: t })) : undefined
+    }),
     signal: signal as RequestInit['signal'],
   });
   if (!res.ok) {
@@ -45,12 +51,13 @@ async function callOpenAI(
     throw new Error(`OpenAI API error ${res.status}: ${body}`);
   }
   const data = (await res.json()) as {
-    choices: Array<{ message: { content: string } }>;
+    choices: Array<{ message: { content: string; tool_calls?: any[] } }>;
     usage: { total_tokens: number };
   };
   return {
     content: data.choices[0]?.message?.content ?? '',
     tokensUsed: data.usage?.total_tokens ?? 0,
+    toolCalls: data.choices[0]?.message?.tool_calls,
   };
 }
 
@@ -59,11 +66,33 @@ async function callAnthropic(
   model: string,
   messages: OpenRouterMessage[],
   maxTokens: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  tools?: any[]
 ): Promise<OpenRouterCallResult> {
   const modelId = model.replace(/^anthropic\//, '');
   const systemMsg = messages.find((m) => m.role === 'system')?.content ?? '';
   const userMessages = messages.filter((m) => m.role !== 'system');
+  
+  const body: any = {
+    model: modelId,
+    system: systemMsg,
+    messages: userMessages.map(m => ({
+      role: m.role,
+      content: m.content,
+      tool_calls: m.tool_calls,
+      tool_call_id: m.tool_call_id,
+    })),
+    max_tokens: maxTokens,
+  };
+
+  if (tools?.length) {
+    body.tools = tools.map(t => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.parameters
+    }));
+  }
+
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -71,12 +100,7 @@ async function callAnthropic(
       'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: modelId,
-      system: systemMsg,
-      messages: userMessages,
-      max_tokens: maxTokens,
-    }),
+    body: JSON.stringify(body),
     signal: signal as RequestInit['signal'],
   });
   if (!res.ok) {
@@ -84,12 +108,24 @@ async function callAnthropic(
     throw new Error(`Anthropic API error ${res.status}: ${body}`);
   }
   const data = (await res.json()) as {
-    content: Array<{ text: string }>;
+    content: Array<{ type: 'text'; text: string } | { type: 'tool_use'; id: string; name: string; input: any }>;
     usage: { input_tokens: number; output_tokens: number };
   };
+
+  const textContent = data.content.find(c => c.type === 'text') as { text: string } | undefined;
+  const toolUses = data.content.filter(c => c.type === 'tool_use') as Array<{ id: string; name: string; input: any }>;
+
   return {
-    content: data.content[0]?.text ?? '',
+    content: textContent?.text ?? '',
     tokensUsed: (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0),
+    toolCalls: toolUses.map(tu => ({
+      id: tu.id,
+      type: 'function',
+      function: {
+        name: tu.name,
+        arguments: JSON.stringify(tu.input)
+      }
+    }))
   };
 }
 
@@ -98,19 +134,34 @@ async function callGoogle(
   model: string,
   messages: OpenRouterMessage[],
   maxTokens: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  tools?: any[]
 ): Promise<OpenRouterCallResult> {
   const modelId = model.replace(/^google\//, '');
   const systemMsg = messages.find((m) => m.role === 'system')?.content;
   const contents = messages
     .filter((m) => m.role !== 'system')
-    .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+    .map((m) => ({ 
+      role: m.role === 'assistant' ? 'model' : 'user', 
+      parts: m.role === 'tool' 
+        ? [{ functionResponse: { name: 'unknown', response: { content: m.content } } }] // Simplified
+        : [{ text: m.content }] 
+    }));
 
   const body: Record<string, unknown> = {
     contents,
     generationConfig: { maxOutputTokens: maxTokens },
   };
   if (systemMsg) body.systemInstruction = { parts: [{ text: systemMsg }] };
+  if (tools?.length) {
+    body.tools = [{
+      functionDeclarations: tools.map(t => ({
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters
+      }))
+    }];
+  }
 
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
@@ -126,12 +177,25 @@ async function callGoogle(
     throw new Error(`Google API error ${res.status}: ${err}`);
   }
   const data = (await res.json()) as {
-    candidates: Array<{ content: { parts: Array<{ text: string }> } }>;
+    candidates: Array<{ content: { parts: Array<{ text?: string; functionCall?: { name: string; args: any } }> } }>;
     usageMetadata: { totalTokenCount: number };
   };
+  
+  const parts = data.candidates[0]?.content?.parts ?? [];
+  const text = parts.find(p => p.text)?.text ?? '';
+  const funcCalls = parts.filter(p => p.functionCall).map(p => ({
+    id: Math.random().toString(36).substring(7),
+    type: 'function' as const,
+    function: {
+      name: p.functionCall!.name,
+      arguments: JSON.stringify(p.functionCall!.args)
+    }
+  }));
+
   return {
-    content: data.candidates[0]?.content?.parts[0]?.text ?? '',
+    content: text,
     tokensUsed: data.usageMetadata?.totalTokenCount ?? 0,
+    toolCalls: funcCalls.length ? funcCalls : undefined
   };
 }
 
@@ -140,7 +204,8 @@ async function callGroq(
   model: string,
   messages: OpenRouterMessage[],
   maxTokens: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  tools?: any[]
 ): Promise<OpenRouterCallResult> {
   const modelId = model.replace(/^groq\//, '');
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -149,7 +214,12 @@ async function callGroq(
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ model: modelId, messages, max_tokens: maxTokens }),
+    body: JSON.stringify({ 
+      model: modelId, 
+      messages, 
+      max_tokens: maxTokens,
+      tools: tools?.length ? tools.map(t => ({ type: 'function', function: t })) : undefined
+    }),
     signal: signal as RequestInit['signal'],
   });
   if (!res.ok) {
@@ -157,12 +227,13 @@ async function callGroq(
     throw new Error(`Groq API error ${res.status}: ${body}`);
   }
   const data = (await res.json()) as {
-    choices: Array<{ message: { content: string } }>;
+    choices: Array<{ message: { content: string; tool_calls?: any[] } }>;
     usage: { total_tokens: number };
   };
   return {
     content: data.choices[0]?.message?.content ?? '',
     tokensUsed: data.usage?.total_tokens ?? 0,
+    toolCalls: data.choices[0]?.message?.tool_calls,
   };
 }
 
@@ -172,12 +243,13 @@ export async function routeModelCall(
   model: string,
   messages: OpenRouterMessage[],
   maxTokens: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  tools?: any[]
 ): Promise<OpenRouterCallResult> {
   const provider = detectProvider(model);
 
   if (provider === 'openrouter') {
-    return callOpenRouter(model, messages, maxTokens, signal);
+    return callOpenRouter(model, messages, maxTokens, signal, tools);
   }
 
   const config = await getModelConfig(provider);

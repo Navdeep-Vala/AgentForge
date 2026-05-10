@@ -18,6 +18,7 @@ const envSchema = z.object({
   MANAGER_MODEL: z.string().default('meta-llama/llama-3.3-70b-instruct:free'),
   DEFAULT_HEARTBEAT_INTERVAL_MINUTES: z.coerce.number().default(15),
   MAX_AUTO_SPAWNED_TASKS: z.coerce.number().default(10),
+  SERPER_API_KEY: z.string().optional(),
 });
 
 const result = envSchema.safeParse(process.env);

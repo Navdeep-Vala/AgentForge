@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
   BookOpen,
+  Bot,
   MessageCircleMore,
   Moon,
   Pause,
@@ -19,6 +20,7 @@ interface AppHeaderProps {
   onOpenChat: () => void;
   onOpenBroadcast: () => void;
   onOpenDocs: () => void;
+  onOpenContext: () => void;
   onPause: () => void;
   mentionCount: number;
 }
@@ -47,6 +49,7 @@ export function AppHeader({
   onOpenChat,
   onOpenBroadcast,
   onOpenDocs,
+  onOpenContext,
   onPause,
   mentionCount,
 }: AppHeaderProps) {
@@ -61,7 +64,7 @@ export function AppHeader({
   ).size;
 
   return (
-    <header className="border-b border-app-border bg-app-surface w-full overflow-hidden">
+    <header className="sticky top-0 z-50 border-b border-app-border bg-app-surface w-full">
       <div className="flex h-[72px] items-center px-6">
         {/* Left: Logo & Project */}
         <div className="flex items-center gap-4 shrink-0 pr-4">
@@ -89,6 +92,7 @@ export function AppHeader({
         <div className="flex shrink-0 items-center gap-1.5 lg:gap-2">
           <div className="hidden xl:flex items-center gap-1.5 lg:gap-2 border-r border-app-border pr-2 mr-2">
             <ActionButton onClick={onOpenDocs} icon={<BookOpen size={16} />}>Docs</ActionButton>
+            <ActionButton onClick={onOpenContext} icon={<Bot size={16} />}>Context</ActionButton>
             <ActionButton onClick={onOpenChat} icon={<MessageCircleMore size={16} />}>Chat</ActionButton>
             <ActionButton onClick={onOpenBroadcast} icon={<Radio size={16} />}>Broadcast</ActionButton>
             <ActionButton onClick={onManageAgents} icon={<Users size={16} />}>Agents</ActionButton>

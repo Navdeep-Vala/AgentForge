@@ -49,6 +49,8 @@ export async function runMigrations(): Promise<void> {
        heartbeat_interval_minutes INT DEFAULT 15,
        sandbox_container_id VARCHAR(100) NULL,
        sandbox_status VARCHAR(20) NULL,
+       session_key VARCHAR(255),
+       type VARCHAR(20) DEFAULT 'main',
        created_at BIGINT NOT NULL,
        updated_at BIGINT NOT NULL,
        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
@@ -63,6 +65,8 @@ export async function runMigrations(): Promise<void> {
    await addColumnIfNotExists(pool, 'sessions', 'heartbeat_interval_minutes', 'INT DEFAULT 15');
    await addColumnIfNotExists(pool, 'sessions', 'sandbox_container_id', 'VARCHAR(100) NULL');
    await addColumnIfNotExists(pool, 'sessions', 'sandbox_status', 'VARCHAR(20) NULL');
+   await addColumnIfNotExists(pool, 'sessions', 'session_key', 'VARCHAR(255)');
+   await addColumnIfNotExists(pool, 'sessions', 'type', "VARCHAR(20) DEFAULT 'main'");
 
   // ── Agent Steps ──────────────────────────────────────────────────────────────
   await pool.execute(`
@@ -221,6 +225,21 @@ export async function runMigrations(): Promise<void> {
       answered_at BIGINT,
       FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
       FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // ── Cron Jobs ────────────────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS cron_jobs (
+      id VARCHAR(36) PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      cron_expression VARCHAR(100) NOT NULL,
+      message TEXT NOT NULL,
+      agent_type VARCHAR(100) DEFAULT 'manager',
+      is_active TINYINT(1) DEFAULT 1,
+      last_run BIGINT,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 

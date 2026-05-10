@@ -129,25 +129,35 @@ export function ProjectSelector() {
                 {/* No-project option */}
                 <button
                   onClick={() => { setCurrentProject(null); setIsOpen(false); }}
-                  className="w-full flex items-center justify-between px-4 py-2 text-sm text-app-sub hover:bg-app-col transition-colors"
+                  className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
+                    !currentProject
+                      ? 'bg-indigo-500/10 text-indigo-400'
+                      : 'text-app-sub hover:bg-app-col'
+                  }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <Folder size={14} className="opacity-50" />
-                    <span>General (No Project)</span>
-                  </div>
-                  {!currentProject && <Check size={14} className="text-indigo-400" />}
+                  {!currentProject ? (
+                    <Check size={14} className="text-indigo-400 shrink-0" />
+                  ) : (
+                    <Folder size={14} className="opacity-50 shrink-0" />
+                  )}
+                  <span>General (No Project)</span>
                 </button>
 
                 {projects.map((p) => (
                   <div key={p.id} className="group relative">
                     <button
                       onClick={() => { setCurrentProject(p); setIsOpen(false); }}
-                      className={`w-full flex items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                         currentProject?.id === p.id
                           ? 'bg-indigo-500/10 text-indigo-400'
                           : 'text-app-text hover:bg-app-col'
                       }`}
                     >
+                      {currentProject?.id === p.id ? (
+                        <Check size={14} className="text-indigo-400 shrink-0" />
+                      ) : (
+                        <Folder size={14} className="text-app-muted/50 shrink-0" />
+                      )}
                       <div className="flex flex-col items-start gap-0.5 overflow-hidden">
                         <span className="truncate w-40 text-left">{p.name}</span>
                         {p.workspace_path && (
@@ -161,9 +171,6 @@ export function ProjectSelector() {
                           </span>
                         )}
                       </div>
-                      {currentProject?.id === p.id && (
-                        <Check size={14} className="text-indigo-400 shrink-0" />
-                      )}
                     </button>
                     {/* Edit button */}
                     <button

@@ -1,4 +1,5 @@
 import { BaseAgent } from './base.agent';
+import { TOOL_USAGE_PROMPT } from './tool-prompt';
 
 export class ResearcherAgent extends BaseAgent {
   readonly type = 'researcher';
@@ -7,6 +8,8 @@ export class ResearcherAgent extends BaseAgent {
   readonly icon = 'Search';
   readonly model = 'google/gemma-4-31b-it:free';
   readonly systemPrompt = `You are a Senior Software Research Engineer. You research new features, libraries, implementation approaches, and architectural patterns for software projects.
+
+${TOOL_USAGE_PROMPT}
 
 ## Your Responsibilities
 When given a research task, produce a comprehensive markdown report with:

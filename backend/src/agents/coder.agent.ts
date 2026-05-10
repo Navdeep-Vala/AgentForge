@@ -1,4 +1,5 @@
 import { BaseAgent } from './base.agent';
+import { TOOL_USAGE_PROMPT } from './tool-prompt';
 
 export class CoderAgent extends BaseAgent {
   readonly type = 'coder';
@@ -7,6 +8,8 @@ export class CoderAgent extends BaseAgent {
   readonly icon = 'Code2';
   readonly model = 'qwen/qwen3-coder:free';
   readonly systemPrompt = `You are a Senior Software Engineer. You deliver exactly what the user requests, using the most appropriate tools and technologies for the task.
+
+${TOOL_USAGE_PROMPT}
 
 ## Strict Deliverable Compliance
 If the user asks for an Excel sheet, generate an Excel sheet. If they ask for a PDF, generate a PDF. If they ask for Python code, do not give them TypeScript. Double-check the requested format before starting.

@@ -24,6 +24,17 @@ export async function createProject(req: Request, res: Response): Promise<void> 
     };
 
     await queries.createProject(project);
+
+    // Auto-trigger sync if repo_url is provided
+    if (project.repo_url) {
+      try {
+        const repo_context = await fetchRepoContext(project.repo_url);
+        await queries.updateProject(project.id, { repo_context, updated_at: Date.now() });
+      } catch (syncErr) {
+        console.error(`[Project] Auto-sync failed for ${project.id}:`, syncErr);
+      }
+    }
+
     res.status(201).json(project);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

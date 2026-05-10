@@ -12,6 +12,7 @@ import {
   DocsModal,
 } from "./components/Squad/SquadChatModal";
 import { TaskDetailModal } from "./components/TaskDetail/TaskDetailModal";
+import { ProjectContextModal } from "./components/ProjectSelector/ProjectContextModal";
 import {
   MentionToasts,
   type MentionToast,
@@ -34,6 +35,7 @@ import { useAgentStore } from "./store/agentStore";
 export default function App() {
   const [agentManagerOpen, setAgentManagerOpen] = useState(false);
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+  const [projectContextOpen, setProjectContextOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<AgentCatalogItem | null>(
     null,
@@ -199,6 +201,7 @@ export default function App() {
         onOpenChat={() => setChatOpen(true)}
         onOpenBroadcast={() => setBroadcastOpen(true)}
         onOpenDocs={() => setDocsOpen(true)}
+        onOpenContext={() => setProjectContextOpen(true)}
         onPause={handlePause}
         mentionCount={userMentions.length + clarificationRequests.filter((c: ClarificationRequest) => c.status === 'pending').length + approvalToasts.length}
       />
@@ -251,6 +254,7 @@ export default function App() {
         />
       )}
       {docsOpen && <DocsModal onClose={() => setDocsOpen(false)} />}
+      {projectContextOpen && <ProjectContextModal onClose={() => setProjectContextOpen(false)} />}
       {agentManagerOpen && (
         <AgentManager onClose={() => setAgentManagerOpen(false)} />
       )}

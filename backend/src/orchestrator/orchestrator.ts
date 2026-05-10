@@ -26,7 +26,9 @@ import { emitSSE, closeSseConnection } from '../controllers/sse.controller';
 import { startHeartbeatJob, stopHeartbeatJob, triggerImmediateHeartbeat } from './heartbeat.service';
 import { DockerService } from '../sandbox/docker.service';
 import { WorkspaceProvisioner } from '../workspace/workspace.provisioner';
-import { Session, Task, CustomAgent, AgentOverride, TaskStatus } from '../types';
+import { Session, Task, CustomAgent, AgentOverride, TaskStatus, SessionType } from '../types';
+
+import { historyService } from '../services/history.service';
 
 const managerAgent = new ManagerAgent();
 const abortControllers = new Map<string, AbortController>();
@@ -34,9 +36,9 @@ const abortControllers = new Map<string, AbortController>();
 // ─── Session goal cache (needed by heartbeat dispatcher) ──────────────────────
 const sessionGoals = new Map<string, string>();
 
-function dispatchSpawnedTask(sessionId: string, workspaceDir: string | undefined, signal: AbortSignal, containerId: string | null, agentOverrides?: Record<string, AgentOverride>) {
+function dispatchSpawnedTask(sessionId: string, workspaceDir: string | undefined, signal: AbortSignal, containerId: string | null, agentOverrides?: Record<string, AgentOverride>, sessionKey?: string) {
   return (task: Task): void => {
-    runTask(task, sessionId, workspaceDir, signal, agentOverrides, containerId || undefined).catch((err) =>
+    runTask(task, sessionId, workspaceDir, signal, agentOverrides, containerId || undefined, sessionKey).catch((err) =>
       console.error(`[Orchestrator] Spawned task ${task.id} error:`, err)
     );
   };
@@ -49,15 +51,26 @@ export async function startSession(
   goal: string,
   projectId?: string,
   workspaceDir?: string,
-  agentOverrides?: Record<string, AgentOverride>
+  agentOverrides?: Record<string, AgentOverride>,
+  sessionType: SessionType = 'main',
+  agentType: string = 'manager'
 ): Promise<void> {
   const controller = new AbortController();
   abortControllers.set(sessionId, controller);
   const { signal } = controller;
 
+  // Generate OpenClaw-style session key: agent:type:id or agent:type:main
+  const sessionKey = sessionType === 'main' 
+    ? `agent:${agentType}:main`
+    : `agent:${agentType}:${sessionId.slice(0, 8)}`;
+  
+  const soulContent = await homeWorkspaceService.getSoul(agentType);
+
   const now = Date.now();
   const session: Session = {
     id: sessionId,
+    session_key: sessionKey,
+    type: sessionType,
     project_id: projectId || null,
     goal,
     status: 'pending',
@@ -69,6 +82,12 @@ export async function startSession(
     created_at: now,
     updated_at: now,
   };
+
+  // Initialize history on disk with SOUL
+  await historyService.appendMessage(sessionKey, {
+    role: 'system',
+    content: `${soulContent}\n\nSession started. Goal: ${goal}`,
+  });
 
   // NEW: Docker container provisioning
   let containerId: string | null = null;
@@ -212,12 +231,12 @@ const effectiveWorkspaceDir = workspaceDir || `/workspaces/${sessionId}`;
       sessionId,
       enrichedGoal,
       session.heartbeat_interval_minutes,
-      dispatchSpawnedTask(sessionId, workspaceDir, signal, containerId, agentOverrides),
+      dispatchSpawnedTask(sessionId, workspaceDir, signal, containerId, agentOverrides, sessionKey),
       agentOverrides
     );
 
     // Run all initial tasks in parallel
-    const taskPromises = taskRecords.map((task) => runTask(task, sessionId, workspaceDir || undefined, signal, agentOverrides, containerId || undefined));
+    const taskPromises = taskRecords.map((task) => runTask(task, sessionId, workspaceDir || undefined, signal, agentOverrides, containerId || undefined, sessionKey));
     const results = await Promise.allSettled(taskPromises);
 
     // Check if any tasks need approval before synthesis
@@ -319,7 +338,8 @@ async function runTask(
   workspaceDir: string | undefined,
   signal: AbortSignal,
   agentOverrides?: Record<string, AgentOverride>,
-  containerId?: string
+  containerId?: string,
+  sessionKey?: string
 ): Promise<void> {
   const startedAt = Date.now();
   await updateTaskStatus(task.id, 'in_progress', startedAt);
@@ -379,6 +399,22 @@ async function runTask(
     });
   }
 
+  // Fetch project context if applicable
+  let projectContext: string | undefined;
+  if (sessionId) {
+    try {
+      const session = await getSessionById(sessionId);
+      if (session?.project_id) {
+        const project = await getProjectById(session.project_id);
+        if (project?.repo_context) {
+          projectContext = project.repo_context;
+        }
+      }
+    } catch (err) {
+      console.warn(`[Orchestrator] Failed to fetch project context for task ${task.id}:`, err);
+    }
+  }
+
   try {
     const result = await executeAgentTask(
       task.agent_type,
@@ -388,7 +424,9 @@ async function runTask(
       workspaceDir,
       signal,
       agentOverrides?.[task.agent_type]?.modelId,
-      containerId
+      containerId,
+      projectContext,
+      sessionKey
     );
 
     const completedAt = Date.now();

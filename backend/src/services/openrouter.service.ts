@@ -27,7 +27,8 @@ export async function callOpenRouter(
   model: string,
   messages: OpenRouterMessage[],
   maxTokens: number = 4096,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  tools?: any[]
 ): Promise<OpenRouterCallResult> {
   const url = `${env.OPENROUTER_BASE_URL}/chat/completions`;
   let lastError: Error = new Error('OpenRouter call failed after retries');
@@ -51,6 +52,7 @@ export async function callOpenRouter(
           messages,
           max_tokens: maxTokens,
           stream: false,
+          tools: tools?.length ? tools.map(t => ({ type: 'function', function: t })) : undefined
         }),
         signal,
       });
@@ -73,16 +75,19 @@ export async function callOpenRouter(
         throw lastError;
       }
 
-      const data = (await response.json()) as OpenRouterResponseBody;
+      const data = (await response.json()) as any;
 
       // DeepSeek R1 and other reasoning models may put the answer in reasoning_content
       // when content is null. Fall back to it so the response is never lost.
+      const choice = data.choices?.[0]?.message;
       const content =
-        data.choices?.[0]?.message?.content ||
-        data.choices?.[0]?.message?.reasoning_content ||
+        choice?.content ||
+        choice?.reasoning_content ||
         null;
 
-      if (!content) {
+      const toolCalls = choice?.tool_calls;
+
+      if (!content && !toolCalls) {
         // Check if model returned an error inside a 200
         if (data.error?.message) {
           lastError = new Error(`Model error: ${data.error.message}`);
@@ -100,8 +105,9 @@ export async function callOpenRouter(
       }
 
       return {
-        content,
+        content: content || '',
         tokensUsed: data.usage?.total_tokens ?? 0,
+        toolCalls,
       };
     } catch (err) {
       if (err instanceof Error && (err.name === 'AbortError' || err.message === 'Request aborted by user')) {

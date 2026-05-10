@@ -1723,3 +1723,39 @@ PRIMARY GOAL
 --------------------------------------------------
 
 Your primary objective is to safely and accurately complete coding tasks inside the sandboxed workspace while maintaining production-quality standards.
+
+is Firecracker MicroVM free to use? can I use it locally for my mission control project? forget orbit for now, I am focused on Mission Control project.
+
+
+
+so let me explain you what I am trying to achieve so that you might be able to understand and give me proper way for implementation.
+
+So I have already create a mission control system, where I have a manager agent - main agent, Iet say I gave him a task that, create an simple excel sheet for task tracking, now it will delegate this task to many other agents available like coder, researcher, R&D, tester, so here let say It delegates task to coder, then I want a way that coder created the required file through code, and for code execution it uses sandbox environment which I need help. and then returns final output as an excel file for download.
+
+Now for the real other situation, what I am trying to achieve is that, I will give this agents a context for example my project github repo link. now let say I give manager a task like, for this project implement full RBAC authentication system. it will delegate this task to coder, now I want a way that the coder agent can make changes to the codebase, but can't commit without my permissions, once I approve all of it's changes, the tester agent will test the whole flow, again will need an environment for it to perform actions. once they both completed I can commit and push the changes my self. 
+
+So I want to achieve like this. how to do so? 
+
+Yes, Firecracker is 100% free and open-source (Apache 2.0).However, using it locally on a Mac or Windows is a headache because it requires a Linux Kernel with KVM (Kernel-based Virtual Machine) support.  Local Dev Recommendation: Stick to Docker + gVisor for your local Mission Control. It gives you 90% of the security of Firecracker with 10% of the setup effort.Production Recommendation: Use Firecracker (via a provider like Fly.io or E2B) if you eventually host Mission Control in the cloud.
+
+2. The Implementation: "The Sandbox-as-a-Service" PatternFor your "Coder needs to edit but not commit" and "Tester needs to run code" workflow, follow this SOP:A. The Workspace Strategy (Git-Linked)Do not give the agent access to your actual .git folder. Instead, use a Shadow Clone.Manager Tool: When a task starts, Mission Control creates a temporary directory.Cloning: It performs a git clone --depth 1 of your repo into that temp directory.Mounting: You mount this temp directory into the Coder's Sandbox.B. The Coder's "Edit & Review" FlowCoder Tool (edit_file): The Coder doesn't just "write code"; it calls a tool that performs a sed command or overwrites a file in the mounted volume.Approval Gate: Mission Control detects the file change. It generates a git diff and shows it to you in your Mission Control UI.The "Lock": The Sandbox has no SSH keys and no Git credentials. The agent physically cannot push even if it tried.C. The Tester's "Execution" FlowOnce you approve the Coder’s changes, the Tester Agent takes over.Spin-up: Mission Control starts a fresh container using the same volume.Execution: The Tester runs npm test or pytest.Reporting: The output is streamed back to the Manager Agent to decide if the task is "Done."3. Builder Step: The "Tool" CodeHere is how your Mission Control (on the host) would trigger the Coder to work on your local files safely.TypeScript// Mission Control Logic (Node.js)
+async function runCoderTask(projectId, codeSnippet) {
+  const projectPath = `/tmp/mission-control/${projectId}`;
+
+  // 1. Create a "Hardened" Container
+  // We use --user to ensure the agent can't touch root files
+  const dockerCmd = `docker run --rm \
+    --network none \
+    -v ${projectPath}:/app \
+    --user 1000:1000 \
+    node:20-slim \
+    bash -c "${codeSnippet}"`;
+
+  try {
+    const { stdout } = await execPromise(dockerCmd);
+    return stdout;
+  } catch (err) {
+    return `Error: ${err.message}`;
+  }
+}
+4. Architecting the "Manager" LogicYour Manager Agent needs a State Machine to track the status of the "RBAC Implementation" task:StepAgentActionSecurity CheckPlanResearcherScans repo for existing auth logic.Read-Only Mount.CodeCoderWrites the JWT/Middleware logic.Write-Access to /tmp clone only.ReviewHUMAN (You)Verify the git diff in Mission Control.Gatekeeper.TestTesterRuns the server and hits endpoints.Ephemeral container, no network.MergeManagerPrompts you to run git commit on host.Agent has no Git access.Summary for Mission ControlDon't use Firecracker locally unless you are on a bare-metal Linux machine. Use Docker with the --network none and --memory flags.Isolation is Key: Use a separate folder for the agents to work in. Never give them access to your primary source code folder directly.Human-in-the-Loop: Your Mission Control should treat "Commit" as a human-only action.

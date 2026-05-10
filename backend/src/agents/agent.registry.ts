@@ -85,7 +85,9 @@ export async function executeAgentTask(
   workspaceDir?: string | null,
   signal?: AbortSignal,
   modelOverride?: string,
-  containerId?: string // NEW: Docker container ID
+  containerId?: string,
+  projectContext?: string,
+  sessionKey?: string
 ): Promise<AgentTaskResult> {
   const resolved = await resolveAgent(agentType);
   const fallbackAgent = BUILT_IN_AGENTS['researcher'];
@@ -108,7 +110,10 @@ export async function executeAgentTask(
        workspaceDir,
        signal as AbortSignal,
        primaryModel,
-       containerId
+       containerId,
+       undefined,
+       projectContext,
+       sessionKey
      );
    }
 
@@ -129,7 +134,16 @@ export async function executeAgentTask(
         4096,
         signal
       );
+      
       const content = result.content || '';
+      
+      // Log to history if sessionKey is provided
+      if (sessionKey) {
+        const { historyService } = await import('../services/history.service');
+        await historyService.appendMessage(sessionKey, { role: 'user', content: taskDescription, name: agentName });
+        await historyService.appendMessage(sessionKey, { role: 'assistant', content, name: agentName });
+      }
+
       const thought = content.replace(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/gs, '').trim();
       
       return { 

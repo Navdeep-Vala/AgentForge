@@ -1,0 +1,54 @@
+{
+  "gateway": {
+    "port": 3001,
+    "host": "0.0.0.0",
+    "name": "AgentForge Gateway"
+  },
+  "ai": {
+    "default_provider": "openrouter",
+    "default_model": "meta-llama/llama-3.3-70b-instruct:free",
+    "providers": {
+      "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key": "${OPENROUTER_API_KEY}"
+      },
+      "openai": {
+        "api_key": "${OPENAI_API_KEY}"
+      },
+      "anthropic": {
+        "api_key": "${ANTHROPIC_API_KEY}"
+      }
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": false,
+      "token": "${TELEGRAM_BOT_TOKEN}"
+    },
+    "discord": {
+      "enabled": false,
+      "token": "${DISCORD_BOT_TOKEN}"
+    },
+    "web": {
+      "enabled": true
+    }
+  },
+  "tools": {
+    "enabled_tools": [
+      "read_file",
+      "write_file",
+      "list_directory",
+      "run_command",
+      "web_search",
+      "execute_code"
+    ],
+    "sandbox": {
+      "type": "docker",
+      "persist_workspace": true
+    }
+  },
+  "workspace": {
+    "base_path": "./workspaces",
+    "default_system_prompt_path": "./prompts/system_default.md"
+  }
+}

@@ -202,4 +202,28 @@ export const AGENT_TOOLS: ToolDefinition[] = [
       required: ['title', 'summary'],
     },
   },
+  {
+    name: 'web_search',
+    description: 'Perform a web search to find latest information, documentation, or solutions. Returns search results with snippets and URLs.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'The search query' },
+        limit: { type: 'number', description: 'Number of results to return (default 5)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'execute_code',
+    description: 'Execute JavaScript, TypeScript, or Python code in a safe Docker sandbox. Use this to test logic, perform calculations, or validate code snippets.',
+    parameters: {
+      type: 'object',
+      properties: {
+        language: { type: 'string', description: 'Language: javascript | typescript | python' },
+        code: { type: 'string', description: 'The code to execute' },
+      },
+      required: ['language', 'code'],
+    },
+  },
 ];

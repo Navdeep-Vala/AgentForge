@@ -14,6 +14,7 @@ import {
   FileChange,
   SubAgent,
   ClarificationRequest,
+  CronJob,
 } from '../types';
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -61,11 +62,13 @@ export async function createSession(session: Session): Promise<void> {
   const pool = getPool();
   await pool.execute(
     `INSERT INTO sessions
-       (id, project_id, goal, status, workspace_dir, final_report, total_tokens_used, estimated_cost_usd,
+       (id, session_key, type, project_id, goal, status, workspace_dir, final_report, total_tokens_used, estimated_cost_usd,
         heartbeat_interval_minutes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       session.id,
+      session.session_key,
+      session.type,
       session.project_id,
       session.goal,
       session.status,
@@ -681,4 +684,37 @@ export async function getChildTasks(parentTaskId: string): Promise<Task[]> {
     [parentTaskId]
   );
   return rows as Task[];
+}
+
+// ─── Cron Jobs ────────────────────────────────────────────────────────────────
+
+export async function createCronJob(job: CronJob): Promise<void> {
+  const pool = getPool();
+  await pool.execute(
+    `INSERT INTO cron_jobs (id, name, cron_expression, message, agent_type, is_active, last_run, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [job.id, job.name, job.cron_expression, job.message, job.agent_type, job.is_active ? 1 : 0, job.last_run, job.created_at, job.updated_at]
+  );
+}
+
+export async function getActiveCronJobs(): Promise<CronJob[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>('SELECT * FROM cron_jobs WHERE is_active = 1');
+  return (rows as any[]).map(r => ({ ...r, is_active: r.is_active === 1 }));
+}
+
+export async function updateCronJobLastRun(id: string, lastRun: number): Promise<void> {
+  const pool = getPool();
+  await pool.execute('UPDATE cron_jobs SET last_run = ? WHERE id = ?', [lastRun, id]);
+}
+
+export async function getAllCronJobs(): Promise<CronJob[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>('SELECT * FROM cron_jobs ORDER BY created_at DESC');
+  return (rows as any[]).map(r => ({ ...r, is_active: r.is_active === 1 }));
+}
+
+export async function deleteCronJob(id: string): Promise<void> {
+  const pool = getPool();
+  await pool.execute('DELETE FROM cron_jobs WHERE id = ?', [id]);
 }

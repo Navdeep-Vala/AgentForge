@@ -1,6 +1,8 @@
 import { FileService } from './file.service';
 import { CommandService } from './command.service';
 import { GitService } from './git.service';
+import { WebSearchService } from '../services/web-search.service';
+import { DockerService } from '../sandbox/docker.service';
 
 export interface ToolResult {
   success: boolean;
@@ -11,7 +13,10 @@ export class ToolExecutor {
   constructor(
     private fileService: FileService,
     private commandService: CommandService,
-    private gitService?: GitService
+    private gitService?: GitService,
+    private webSearchService?: WebSearchService,
+    private dockerService?: DockerService,
+    private sessionId?: string
   ) {}
 
   async execute(toolName: string, args: any): Promise<ToolResult> {
@@ -88,6 +93,48 @@ export class ToolExecutor {
         // Task completion
         case 'task_complete':
           return { success: true, output: args.summary || 'Task completed.' };
+
+        // Web Research
+        case 'web_search':
+          if (!this.webSearchService) throw new Error('Web search service not available');
+          const searchResults = await this.webSearchService.search(args.query, args.limit);
+          const searchOutput = searchResults.map(r => `[${r.title}](${r.link})\n${r.snippet}`).join('\n\n');
+          return { success: true, output: searchOutput || 'No results found.' };
+
+        // Code Execution
+        case 'execute_code':
+          if (!this.dockerService) throw new Error('Docker service not available');
+          if (!this.sessionId) throw new Error('Session ID not available for docker execution');
+          
+          let fileName = '';
+          let runCmd = [];
+          
+          if (args.language === 'javascript' || args.language === 'nodejs') {
+            fileName = 'temp_exec.js';
+            runCmd = ['node', fileName];
+          } else if (args.language === 'typescript') {
+            fileName = 'temp_exec.ts';
+            runCmd = ['npx', 'tsx', fileName];
+          } else if (args.language === 'python') {
+            fileName = 'temp_exec.py';
+            runCmd = ['python3', fileName];
+          } else {
+            throw new Error(`Unsupported language: ${args.language}`);
+          }
+
+          // Write file to workspace first
+          await this.fileService.writeFile(fileName, args.code);
+          
+          // Execute in container
+          const execResult = await this.dockerService.executeCommand(this.sessionId, runCmd);
+          
+          // Cleanup
+          await this.fileService.deleteFile(fileName).catch(() => {});
+
+          return {
+            success: execResult.exitCode === 0,
+            output: `STDOUT:\n${execResult.stdout}\n\nSTDERR:\n${execResult.stderr}`,
+          };
           
         default:
           return { success: false, output: `Unknown tool: ${toolName}` };

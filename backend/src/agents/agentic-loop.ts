@@ -20,6 +20,8 @@ import { v4 as uuidv4 } from 'uuid';
 import * as queries from '../db/queries';
 import { getActiveCustomAgents, resolveAgent } from './agent.registry';
 import { env } from '../config/env';
+import { WebSearchService } from '../services/web-search.service';
+import { historyService } from '../services/history.service';
 
 export interface AgentTaskResult {
   content: string;
@@ -510,29 +512,34 @@ export async function executeAgenticTask(
   signal: AbortSignal,
   modelOverride?: string,
   containerId?: string,
-  predecessorTaskStatus?: TaskStatus
+  predecessorTaskStatus?: TaskStatus,
+  projectContext?: string,
+  sessionKey?: string
 ): Promise<AgentTaskResult> {
   const workspace = new WorkspaceManager(workspaceDir);
   const fileService = new FileService(workspace);
+
+  const webSearchService = new WebSearchService();
+  const dockerServiceInstance = new DockerService();
 
   let commandService: CommandService | SandboxCommandService;
   let gitService: GitService | null;
 
   if (containerId) {
-    const dockerService = new DockerService();
-    commandService = new SandboxCommandService(dockerService, containerId);
-    gitService = new GitService(dockerService, containerId);
+    commandService = new SandboxCommandService(dockerServiceInstance, containerId);
+    gitService = new GitService(dockerServiceInstance, containerId);
   } else {
     commandService = new CommandService(workspace);
     gitService = null;
   }
 
-  // Type-safe instantiation: ToolExecutor expects CommandService specifically
-  // For sandbox, we use CommandService wrapper instead
   const toolExecutor = new ToolExecutor(
     fileService,
     containerId ? new CommandService(workspace) : (commandService as CommandService),
-    gitService || undefined
+    gitService || undefined,
+    webSearchService,
+    dockerServiceInstance,
+    sessionId
   );
 
   const projectTree = await workspace.getProjectTree();
@@ -540,12 +547,41 @@ export async function executeAgenticTask(
   // Resolve agent's system prompt
   const resolved = await resolveAgent(agentType);
   const fallbackAgent = (await getActiveCustomAgents())[0];
-  const systemPrompt = resolved?.systemPrompt ?? `You are the ${agentName} agent (${agentType}).`;
+  let basePrompt = resolved?.systemPrompt ?? `You are the ${agentName} agent (${agentType}).`;
+
+  // Fetch soul from HomeWorkspace
+  const soulContent = await homeWorkspaceService.getSoul(agentType);
+  let systemPrompt = `${soulContent}\n\nCORE DIRECTIVES:\n${basePrompt}`;
+
+  if (projectContext) {
+    systemPrompt += `\n\nPROJECT CONTEXT:\n${projectContext.slice(0, 30_000)}`;
+  }
 
   const messages: OpenRouterMessage[] = [
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: buildUserPrompt(taskDescription, projectTree) },
   ];
+
+  if (sessionKey) {
+    const existingHistory = await historyService.loadHistory(sessionKey);
+    // Filter out previous system messages to avoid duplication, and add the rest
+    const historyToInclude = existingHistory
+      .filter(h => h.role !== 'system')
+      .map(h => ({
+        role: h.role as any,
+        content: h.content,
+        name: h.name,
+        tool_call_id: h.tool_call_id,
+        tool_calls: h.tool_calls
+      }));
+    
+    messages.push(...historyToInclude);
+
+    // If this is a new message (not just resuming), log the system and user prompt
+    await historyService.appendMessage(sessionKey, { role: 'system', content: systemPrompt, name: agentName });
+    await historyService.appendMessage(sessionKey, { role: 'user', content: taskDescription, name: agentName });
+  }
+
+  messages.push({ role: 'user', content: buildUserPrompt(taskDescription, projectTree) });
 
   const thoughts: string[] = [];
   let totalTokens = 0;
@@ -652,22 +688,45 @@ export async function executeAgenticTask(
       message: `Step ${i + 1}: Thinking...`,
     });
 
-    const result = await routeModelCall(modelUsed, messages, 4096, signal);
+    const result = await routeModelCall(modelUsed, messages, 4096, signal, AGENT_TOOLS);
     totalTokens += result.tokensUsed;
 
     const content = result.content || '';
+    if (sessionKey) {
+      await historyService.appendMessage(sessionKey, { role: 'assistant', content, name: agentName });
+    }
     const thoughtText = content.replace(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/gs, '').trim();
     if (thoughtText) thoughts.push(thoughtText);
 
-    // Parse tool call from content
+    // 1. Handle native tool calls if present
     let toolCall: { tool: string; args: any } | null = null;
-    try {
-      const jsonMatch = content.match(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/s);
-      if (jsonMatch) {
-        toolCall = JSON.parse(jsonMatch[0]);
+    
+    if (result.toolCalls && result.toolCalls.length > 0) {
+      const tc = result.toolCalls[0]; // Handle first tool call for now
+      if (tc.function) {
+        try {
+          toolCall = {
+            tool: tc.function.name,
+            args: typeof tc.function.arguments === 'string' 
+              ? JSON.parse(tc.function.arguments) 
+              : tc.function.arguments
+          };
+        } catch (e) {
+          console.error('[AgenticLoop] Failed to parse native tool arguments:', e);
+        }
       }
-    } catch (e) {
-      // Not a valid tool call JSON
+    }
+
+    // 2. Fallback to regex parsing if no native tool call was found
+    if (!toolCall) {
+      try {
+        const jsonMatch = content.match(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/s);
+        if (jsonMatch) {
+          toolCall = JSON.parse(jsonMatch[0]);
+        }
+      } catch (e) {
+        // Not a valid tool call JSON
+      }
     }
 
     if (toolCall) {
@@ -913,8 +972,12 @@ export async function executeAgenticTask(
       });
 
       if (toolCall.tool === 'task_complete') {
+        const summary = toolCall.args.summary || content;
+        if (sessionKey) {
+          await historyService.appendMessage(sessionKey, { role: 'assistant', content: summary, name: agentName });
+        }
         return {
-          content: toolCall.args.summary || content,
+          content: summary,
           tokensUsed: totalTokens,
           modelUsed,
           status: 'done',
@@ -926,14 +989,28 @@ export async function executeAgenticTask(
       }
 
       messages.push({ role: 'assistant', content });
+      const toolOutput = toolResult.output;
+      
+      if (sessionKey) {
+        await historyService.appendMessage(sessionKey, { 
+          role: 'tool', 
+          content: toolOutput, 
+          name: toolCall.tool 
+        });
+      }
+
       messages.push({
         role: 'user',
-        content: `TOOL RESULT (${toolCall.tool}):\n${toolResult.output}`,
+        content: `TOOL RESULT (${toolCall.tool}):\n${toolOutput}`,
       });
     } else {
       // No tool call - final answer or direct response
       if (thoughtText) thoughts.push(thoughtText);
       
+      if (sessionKey) {
+        await historyService.appendMessage(sessionKey, { role: 'assistant', content, name: agentName });
+      }
+
       if (i > 0) {
         return {
           content,

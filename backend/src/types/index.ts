@@ -19,8 +19,12 @@ export interface Project {
   updated_at: number;
 }
 
+export type SessionType = 'main' | 'isolated';
+
 export interface Session {
   id: string;
+  session_key: string;
+  type: SessionType;
   project_id: string | null;
   goal: string;
   status: SessionStatus;
@@ -117,6 +121,18 @@ export interface CustomAgent {
   icon: string;
   is_active: boolean;
   created_at: number;
+}
+
+export interface CronJob {
+  id: string;
+  name: string;
+  cron_expression: string;
+  message: string;
+  agent_type: string;
+  is_active: boolean;
+  last_run: number | null;
+  created_at: number;
+  updated_at: number;
 }
 
 export interface ManagerTaskPlan {
