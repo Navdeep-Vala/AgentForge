@@ -10,6 +10,7 @@ const AGENT_COLORS: Record<string, string> = {
   tester: '#F59E0B',
   rnd: '#8B5CF6',
   manager: '#F97316',
+  navdeep: '#ec4899',
 };
 
 function getAgentColor(agentType: string): string {
@@ -102,6 +103,7 @@ export function useSSE(sessionId: string | null): void {
             message: `Task created: ${msg.task.title}`,
             agentName: msg.task.agent_name,
             agentColor: getAgentColor(msg.task.agent_type),
+            taskId: msg.task.id,
           });
           if (msg.task.spawned_by_agent) {
             addEvent({
@@ -109,6 +111,7 @@ export function useSSE(sessionId: string | null): void {
               message: `Auto-created: ${msg.task.title}`,
               agentName: msg.task.agent_name,
               agentColor: getAgentColor(msg.task.agent_type),
+              taskId: msg.task.id,
             });
           }
           break;
@@ -120,6 +123,7 @@ export function useSSE(sessionId: string | null): void {
             message: `Claimed by ${msg.agentName}`,
             agentName: msg.agentName,
             agentColor: getAgentColor(msg.agentType),
+            taskId: msg.taskId,
           });
           break;
 
@@ -135,12 +139,13 @@ export function useSSE(sessionId: string | null): void {
             type: 'task_completed',
             message: 'Task completed',
             agentColor: '#10B981',
+            taskId: msg.task.id,
           });
           break;
 
         case 'task_failed':
           updateTaskStatus(msg.taskId, 'failed');
-          addEvent({ type: 'task_failed', message: msg.error, agentColor: '#EF4444' });
+          addEvent({ type: 'task_failed', message: msg.error, agentColor: '#EF4444', taskId: msg.taskId });
           break;
 
         case 'task_comment':
@@ -150,6 +155,7 @@ export function useSSE(sessionId: string | null): void {
             message: `${msg.comment.comment_type}: ${msg.comment.content}`,
             agentName: msg.comment.agent_name,
             agentColor: getAgentColor(msg.comment.agent_type),
+            taskId: msg.comment.task_id,
           });
           break;
 
@@ -197,6 +203,16 @@ export function useSSE(sessionId: string | null): void {
             message: msg.message,
             agentName: msg.agentName,
             agentColor: getAgentColor(msg.agentType),
+            taskId: msg.taskId,
+          });
+          break;
+
+        case 'model_retry':
+          addEvent({
+            type: 'status',
+            message: msg.message,
+            agentName: msg.agentName,
+            agentColor: '#F59E0B', // Amber for retry
           });
           break;
 

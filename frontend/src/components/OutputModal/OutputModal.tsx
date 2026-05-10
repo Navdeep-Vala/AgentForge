@@ -7,6 +7,7 @@ import { X, Copy, Check } from 'lucide-react';
 import { Task } from '../../types';
 
 const AGENT_COLORS: Record<string, string> = {
+  manager:    '#d8892d',
   researcher: '#3B82F6',
   coder:      '#10B981',
   tester:     '#F59E0B',

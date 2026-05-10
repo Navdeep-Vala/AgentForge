@@ -22,6 +22,10 @@ export class CronService {
    */
   public async initialize(): Promise<void> {
     console.log('[CronService] Initializing scheduled tasks...');
+    
+    // Ensure default heartbeats for built-in agents exist
+    await this.ensureDefaultHeartbeats();
+
     const jobs = await getActiveCronJobs();
     
     for (const job of jobs) {
@@ -29,6 +33,42 @@ export class CronService {
     }
     
     console.log(`[CronService] Scheduled ${jobs.length} active tasks.`);
+  }
+
+  /**
+   * Create staggered heartbeats for built-in agents if they don't exist in the DB.
+   */
+  private async ensureDefaultHeartbeats(): Promise<void> {
+    const defaultJobs = [
+      { name: 'manager-heartbeat', cron: '0,15,30,45 * * * *', type: 'manager', role: 'Lead Orchestrator' },
+      { name: 'researcher-heartbeat', cron: '2,17,32,47 * * * *', type: 'researcher', role: 'Technical Researcher' },
+      { name: 'coder-heartbeat', cron: '4,19,34,49 * * * *', type: 'coder', role: 'Software Engineer' },
+      { name: 'tester-heartbeat', cron: '6,21,36,51 * * * *', type: 'tester', role: 'QA Engineer' },
+      { name: 'rnd-heartbeat', cron: '8,23,38,53 * * * *', type: 'rnd', role: 'R&D Specialist' },
+      { name: 'daily-standup', cron: '0 18 * * *', type: 'manager', role: 'Lead Manager' },
+    ];
+
+    const existingJobs = await getActiveCronJobs();
+    const existingNames = new Set(existingJobs.map(j => j.name));
+
+    for (const def of defaultJobs) {
+      if (!existingNames.has(def.name)) {
+        const job: CronJob = {
+          id: uuidv4(),
+          name: def.name,
+          cron_expression: def.cron,
+          message: `You are the ${def.role}. Check Mission Control for new tasks or updates to existing projects. Summarize your status.`,
+          agent_type: def.type,
+          is_active: true,
+          last_run: null,
+          created_at: Date.now(),
+          updated_at: Date.now()
+        };
+        const { createCronJob } = await import('../db/queries');
+        await createCronJob(job);
+        console.log(`[CronService] Created default heartbeat: ${def.name}`);
+      }
+    }
   }
 
   /**
@@ -46,6 +86,12 @@ export class CronService {
       try {
         // Update last run time
         await updateCronJobLastRun(job.id, Date.now());
+
+        if (job.name === 'daily-standup') {
+          const { standupService } = await import('./standup.service');
+          await standupService.generateDailyStandup();
+          return;
+        }
         
         // Start a new isolated session for the cron task
         await startSession(
@@ -54,7 +100,8 @@ export class CronService {
           undefined, 
           undefined, 
           undefined, 
-          'isolated'
+          'isolated',
+          job.agent_type
         );
       } catch (err) {
         console.error(`[CronService] Job ${job.name} (${job.id}) failed to start session:`, err);

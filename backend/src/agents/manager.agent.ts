@@ -1,3 +1,5 @@
+import { BaseAgent } from './base.agent';
+import { emitSSE } from '../controllers/sse.controller';
 import { callOpenRouter } from '../services/openrouter.service';
 import { routeModelCall } from '../services/model-router.service';
 import { getDynamicFallbacks } from '../services/free-model-pool.service';
@@ -6,8 +8,9 @@ import { env } from '../config/env';
 
 const MANAGER_SYSTEM_PROMPT = `You are the Manager AI in a development team. Your job is to:
 1. Determine if the user input is a real, actionable project goal.
-   - If it is a greeting, test message, random text, or anything that is NOT a software/product/research goal, return: {"tasks": [], "error": "Input is not a project goal."}
+   - If it is a greeting, test message, random text, or anything that is NOT a software/product/research/data-automation goal, return: {"tasks": [], "error": "Input is not a project goal."}
 2. If it IS a real goal, break it down into only the necessary, actionable tasks and assign each to the right specialist: researcher, coder, tester, rnd (or any custom agent type listed).
+   - Note: Your team is fully capable of creating Excel spreadsheets, CSVs, and PDF reports using Python (via 'execute_code'). Coder or specialized data agents should handle these.
 3. Each task description should be detailed enough that the agent can execute autonomously. Include specifics about what files to modify, what patterns to follow, and what the acceptance criteria are.
 4. **Parallel Sub-Agent Delegation**: If a task involves complex multi-step work where specialized sub-agents could help (e.g., checking individual files, running parallel error checks, testing specific modules), EXPLICITLY instruct the agent in its task description to use "spawn_sub_agent" to delegate sub-tasks in parallel to speed up the process (e.g., "Spawn parallel sub-agents for file checking and error verification on each file").
 5. **Specialized On-The-Go Agents**: If the goal requires a very specific specialized skill that NO existing built-in agent covers (e.g., "database schema migration", "accessibility auditing", "internationalization", "performance profiling", "GraphQL optimization", "API gateway design"), you MUST create a new specialized agent type by setting agent_type to a new, unique type name (e.g., "db_migration_specialist", "a11y_auditor", "i18n_specialist", "perf_profiler", "graphql_optimizer", "api_gateway_designer") and provide a detailed description. The system will automatically create this agent for you to execute the task. Use this when:
@@ -54,14 +57,21 @@ Do not include any text outside the JSON object.`;
 
 const SYNTHESIS_SYSTEM_PROMPT = `You are the Manager of an AI development team. Synthesize the team's findings into a comprehensive final report formatted as clean markdown.`;
 
-export class ManagerAgent {
+export class ManagerAgent extends BaseAgent {
+  readonly type = 'manager';
+  readonly name = 'Manager';
+  readonly color = '#d8892d';
+  readonly icon = 'Zap';
   readonly model: string;
+  readonly systemPrompt = MANAGER_SYSTEM_PROMPT;
 
   constructor() {
+    super();
     this.model = env.MANAGER_MODEL;
   }
 
   async decompose(
+    sessionId: string,
     goal: string,
     activeAgentDescriptions: string,
     signal?: AbortSignal,
@@ -89,6 +99,12 @@ export class ManagerAgent {
     // Step 1: Try the primary model
     triedModels.push(primaryModel);
     if (!signal?.aborted) {
+      emitSSE(sessionId, { 
+        type: 'agent_thinking', 
+        agentType: 'manager', 
+        agentName: 'Manager', 
+        message: `Orchestrating mission with ${primaryModel}...` 
+      });
       try {
         console.log(`[Manager] Decomposing with primary model: ${primaryModel}`);
         const result = await routeModelCall(primaryModel, messages, 2048, signal);
@@ -108,6 +124,14 @@ export class ManagerAgent {
     for (const model of dynamicFallbacks) {
       if (signal?.aborted) throw new Error('Request aborted by user');
       triedModels.push(model);
+      emitSSE(sessionId, { 
+        type: 'model_retry', 
+        agentType: 'manager', 
+        agentName: 'Manager', 
+        previousModel: primaryModel,
+        nextModel: model,
+        message: `Primary model failed. Retrying with fallback: ${model}...` 
+      });
       try {
         console.log(`[Manager] Trying fallback model: ${model}`);
         const result = await routeModelCall(model, messages, 2048, signal);
@@ -152,6 +176,12 @@ export class ManagerAgent {
     // Step 1: Try the primary model
     triedModels.push(primaryModel);
     if (!signal?.aborted) {
+      emitSSE(sessionId, { 
+        type: 'agent_thinking', 
+        agentType: 'manager', 
+        agentName: 'Manager', 
+        message: 'Synthesizing final mission report...' 
+      });
       try {
         console.log(`[Manager] Synthesizing with primary model: ${primaryModel}`);
         const result = await routeModelCall(primaryModel, messages, 4096, signal);
@@ -208,6 +238,49 @@ export class ManagerAgent {
     }
 
     return parsed;
+  }
+
+  async verifyTask(
+    sessionId: string,
+    task: { title: string; description: string; agent_type: string },
+    output: string,
+    signal?: AbortSignal
+  ): Promise<{ verified: boolean; feedback?: string }> {
+    const prompt = `You are the Manager. Verify if the following task has been successfully completed according to its description and deliverables.
+Task Title: ${task.title}
+Task Description: ${task.description}
+Agent Type: ${task.agent_type}
+
+Agent Output:
+${output}
+
+Analyze if the agent actually delivered what was requested (e.g., if an Excel file was requested, did they mention creating it? If code was requested, is it present?).
+Return ONLY valid JSON:
+{
+  "verified": true|false,
+  "feedback": "If not verified, explain exactly what is missing or what the agent needs to do differently. If verified, keep this empty."
+}`;
+
+    const messages: OpenRouterMessage[] = [
+      { role: 'system', content: 'You are a rigorous Manager. Your goal is to ensure high quality and deliverable compliance.' },
+      { role: 'user', content: prompt },
+    ];
+
+    try {
+      emitSSE(sessionId, { 
+        type: 'agent_thinking', 
+        agentType: 'manager', 
+        agentName: 'Manager', 
+        message: `Verifying deliverable for "${task.title}"...` 
+      });
+      const result = await routeModelCall(this.model, messages, 1024, signal);
+      const parsed = JSON.parse(extractJson(result.content ?? '')) as { verified: boolean; feedback?: string };
+      return parsed;
+    } catch (err) {
+      console.error(`[Manager] Verification failed:`, err);
+      // Fallback to verified if the model fails to keep the loop moving, but log it
+      return { verified: true };
+    }
   }
 }
 

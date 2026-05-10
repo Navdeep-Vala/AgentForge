@@ -26,10 +26,12 @@ export interface FeedEvent {
     | 'approval_result'
     | 'specialized_agent_spawned'
     | 'file_changed'
+    | 'status'
     | 'error';
   message: string;
   agentName?: string;
   agentColor?: string;
+  taskId?: string;
   timestamp: number;
 }
 

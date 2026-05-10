@@ -1,4 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { env } from '../config/env';
 import { ManagerAgent } from '../agents/manager.agent';
 import {
@@ -26,9 +28,13 @@ import { emitSSE, closeSseConnection } from '../controllers/sse.controller';
 import { startHeartbeatJob, stopHeartbeatJob, triggerImmediateHeartbeat } from './heartbeat.service';
 import { DockerService } from '../sandbox/docker.service';
 import { WorkspaceProvisioner } from '../workspace/workspace.provisioner';
+import { WorkspaceManager } from '../workspace/workspace.manager';
 import { Session, Task, CustomAgent, AgentOverride, TaskStatus, SessionType } from '../types';
 
 import { historyService } from '../services/history.service';
+import { detectTechnologies } from '../workspace/tech-detector';
+import { homeWorkspaceService } from '../services/home-workspace.service';
+import { getSessionById } from '../db/queries';
 
 const managerAgent = new ManagerAgent();
 const abortControllers = new Map<string, AbortController>();
@@ -123,7 +129,10 @@ export async function startSession(
     let plan;
     try {
       emitSSE(sessionId, { type: 'manager_working', message: 'Decomposing goal into actionable tasks...' });
-      plan = await managerAgent.decompose(enrichedGoal, agentDescriptions, signal, agentOverrides?.manager?.modelId);
+      plan = await managerAgent.decompose(sessionId, enrichedGoal, agentDescriptions, signal, agentOverrides?.manager?.modelId);
+      if (plan.thought) {
+        emitSSE(sessionId, { type: 'manager_working', message: `Thought: ${plan.thought}` });
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await updateSessionStatus(sessionId, 'cancelled', Date.now());
@@ -197,27 +206,56 @@ export async function startSession(
       });
     }
 
-    // NEW: Provision Docker workspace if projectId or workspaceDir is provided
+    // NEW: Provision Mission Control workspace
     if (workspaceDir || projectId) {
-const effectiveWorkspaceDir = workspaceDir || `/workspaces/${sessionId}`;
-    const project = projectId ? await getProjectById(projectId) : null;
+      const effectiveWorkspaceDir = workspaceDir || `/tmp/mission-control/workspaces/${sessionId}`;
+      const project = projectId ? await getProjectById(projectId) : null;
+      const seedsPath = `/tmp/mission-control/seeds/${sessionId}`;
 
-    try {
+      try {
+        // 1. Initial provision (clone if needed)
         containerId = await provisioner.provisionWorkspace(
           sessionId,
           effectiveWorkspaceDir,
           project?.repo_url || undefined,
-          'main' // could be configurable
+          'main'
         );
+
+        // 2. Detect technologies
+        const tech = await detectTechnologies(effectiveWorkspaceDir);
+        
+        // 3. Stop the initial single container and start Mission Control
+        await dockerService.destroySandbox(containerId);
+        
+        await dockerService.startMissionControl({
+          sessionId,
+          appImage: tech.appImage,
+          dbImage: tech.dbImage,
+          dbName: 'mission_db',
+          dbUser: 'agent',
+          dbPass: 'secret',
+          workspacePath: effectiveWorkspaceDir,
+          seedsPath: seedsPath,
+        });
+
+        // 4. Get the new app container ID
+        containerId = await dockerService.getMissionControlContainerId(sessionId, effectiveWorkspaceDir, 'app-service');
+        
+        // 5. Generate project map (ag-refresh equivalent)
+        const workspace = new WorkspaceManager(effectiveWorkspaceDir);
+        const projectTree = await workspace.getProjectTree(5);
+        const mapContent = `# Project Map\n\nGenerated at: ${new Date().toISOString()}\n\n## Structure\n\`\`\`\n${projectTree}\n\`\`\`\n`;
+        await fs.writeFile(path.join(effectiveWorkspaceDir, 'map.md'), mapContent);
+
         // Save container ID to session
         await updateSessionContainerId(sessionId, containerId);
       } catch (err) {
-        console.error(`[Orchestrator] Failed to provision workspace:`, err);
+        console.error(`[Orchestrator] Failed to provision Mission Control workspace:`, err);
         await updateSessionStatus(sessionId, 'cancelled', Date.now());
         emitSSE(sessionId, {
           type: 'error',
           taskId: '',
-          message: `Failed to provision workspace: ${err instanceof Error ? err.message : err}`,
+          message: `Failed to provision Mission Control workspace: ${err instanceof Error ? err.message : err}`,
         });
         closeSseConnection(sessionId);
         abortControllers.delete(sessionId);
@@ -299,7 +337,8 @@ const effectiveWorkspaceDir = workspaceDir || `/workspaces/${sessionId}`;
       cost_usd: 0,
     });
 
-    setTimeout(() => closeSseConnection(sessionId), 5000);
+    // Keep connection open for follow-up feedback
+    setTimeout(() => closeSseConnection(sessionId), 10 * 60 * 1000);
   } catch (err) {
     console.error(`[Orchestrator] Session ${sessionId} error:`, err);
     stopHeartbeatJob(sessionId);
@@ -311,17 +350,21 @@ const effectiveWorkspaceDir = workspaceDir || `/workspaces/${sessionId}`;
     });
     closeSseConnection(sessionId);
   } finally {
-    // NEW: Cleanup Docker container on session end
+    // NEW: Cleanup Docker environment on session end
     if (containerId) {
       try {
-        await dockerService.destroySandbox(containerId);
-        // Optional: delete workspace directory if configured not to persist
-        if (workspaceDir && process.env.SANDBOX_PERSIST_WORKSPACE !== 'true') {
-          const { rm } = await import('fs/promises');
-          await rm(workspaceDir, { recursive: true, force: true }).catch(() => {});
+        if (workspaceDir) {
+           await dockerService.stopMissionControl(sessionId, workspaceDir);
+        } else {
+           // If we didn't have workspaceDir stored, we might need it from session
+           const session = await getSessionById(sessionId);
+           if (session?.workspace_dir) {
+             await dockerService.stopMissionControl(sessionId, session.workspace_dir);
+           }
         }
+        await dockerService.destroySandbox(containerId).catch(() => {}); // cleanup if single container
       } catch (err) {
-        console.error('Failed to destroy sandbox:', err);
+        console.error('Failed to cleanup sandbox:', err);
       }
     }
     
@@ -430,7 +473,24 @@ async function runTask(
     );
 
     const completedAt = Date.now();
-    const finalStatus: TaskStatus = result.status ?? 'done';
+    let finalStatus: TaskStatus = result.status ?? 'done';
+
+    // NEW: Deliverable Verification Step
+    if (finalStatus === 'done' && !signal?.aborted) {
+      try {
+        const verification = await managerAgent.verifyTask(sessionId, task, result.content, signal);
+        if (!verification.verified) {
+          finalStatus = 'failed';
+          result.content = `[VERIFICATION FAILED BY MANAGER]\n\nFeedback: ${verification.feedback}\n\nOriginal Output:\n${result.content}`;
+          emitSSE(sessionId, {
+            type: 'manager_working',
+            message: `Verification failed for "${task.title}": ${verification.feedback}`,
+          });
+        }
+      } catch (verifErr) {
+        console.warn(`[Orchestrator] Manager verification failed, proceeding with original status:`, verifErr);
+      }
+    }
 
     await updateTaskComplete(task.id, finalStatus, result.content, result.tokensUsed, result.modelUsed, completedAt, result.thought || task.thought);
     await incrementSessionTokens(sessionId, result.tokensUsed, Date.now());
@@ -631,4 +691,73 @@ async function waitForPredecessorApproval(task: Task, sessionId: string, signal:
   }
 
   return false;
+}
+
+export async function handleTaskFeedback(
+  taskId: string,
+  sessionId: string,
+  comment: { content: string; agent_name: string; agent_type: string }
+): Promise<void> {
+  const task = await getTaskById(taskId);
+  if (!task) return;
+
+  const mentions = Array.from(comment.content.matchAll(/@([a-z0-9_-]+)/gi)).map(m => m[1].toLowerCase());
+  const managerMentioned = mentions.includes('manager');
+  const assigneeMentioned = mentions.includes(task.agent_type.toLowerCase()) || mentions.includes(task.agent_name.toLowerCase());
+
+  if (!managerMentioned && !assigneeMentioned) return;
+
+  console.log(`[Orchestrator] Feedback detected for task ${taskId}. Mentions:`, mentions);
+
+  // If the task is done or failed, and someone mentioned the agent, we should probably reopen it
+  if (task.status === 'done' || task.status === 'failed' || task.status === 'needs_approval' || task.status === 'todo') {
+    // Show thinking state for the person mentioned
+    if (managerMentioned) {
+      emitSSE(sessionId, {
+        type: 'agent_thinking',
+        agentType: 'manager',
+        agentName: 'Manager',
+        message: `Processing your feedback for "${task.title}"...`,
+      });
+    }
+
+    if (assigneeMentioned && task.agent_type !== 'manager') {
+      emitSSE(sessionId, {
+        type: 'agent_thinking',
+        agentType: task.agent_type,
+        agentName: task.agent_name,
+        message: `Re-evaluating based on your comments...`,
+      });
+    }
+
+    const feedbackContext = `[USER FEEDBACK from ${comment.agent_name}]: ${comment.content}`;
+    
+    const session = await getSessionById(sessionId);
+    if (!session) return;
+
+    // Ensure session is active
+    if (session.status !== 'running') {
+      await updateSessionStatus(sessionId, 'running', Date.now());
+      emitSSE(sessionId, { type: 'session_status_changed', status: 'running' });
+    }
+
+    let controller = abortControllers.get(sessionId);
+    if (!controller) {
+      console.log(`[Orchestrator] Re-creating AbortController for session ${sessionId}`);
+      controller = new AbortController();
+      abortControllers.set(sessionId, controller);
+    }
+
+    // Re-run the task with feedback
+    const updatedTask = { ...task, description: `${task.description}\n\n${feedbackContext}`, status: 'in_progress' };
+    await updateTaskStatus(task.id, 'in_progress', Date.now());
+    
+    const containerId = session.sandbox_container_id || undefined;
+
+    console.log(`[Orchestrator] Re-running task ${task.id} with feedback`);
+    // Use a background promise to run the task
+    runTask(updatedTask as Task, sessionId, session.workspace_dir || undefined, controller.signal, undefined, containerId, session.session_key).catch(err => {
+      console.error(`[Orchestrator] Error re-running task ${task.id} after feedback:`, err);
+    });
+  }
 }

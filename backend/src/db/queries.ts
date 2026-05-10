@@ -307,6 +307,15 @@ export async function getCommentsByTaskId(taskId: string): Promise<TaskComment[]
   return rows as TaskComment[];
 }
 
+export async function getAgentStepsByTaskId(taskId: string): Promise<any[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute<RowDataPacket[]>(
+    'SELECT * FROM agent_steps WHERE task_id = ? ORDER BY step_number ASC',
+    [taskId]
+  );
+  return rows as any[];
+}
+
 export async function getCommentsBySessionId(sessionId: string): Promise<TaskComment[]> {
   const pool = getPool();
   const [rows] = await pool.execute<RowDataPacket[]>(
@@ -717,4 +726,95 @@ export async function getAllCronJobs(): Promise<CronJob[]> {
 export async function deleteCronJob(id: string): Promise<void> {
   const pool = getPool();
   await pool.execute('DELETE FROM cron_jobs WHERE id = ?', [id]);
+}
+
+// ── Task Subscriptions ──────────────────────────────────────────────────────
+
+export async function getTaskSubscriptions(taskId: string): Promise<any[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute('SELECT * FROM task_subscriptions WHERE task_id = ?', [taskId]);
+  return rows as any[];
+}
+
+export async function createTaskSubscription(taskId: string, agentType: string): Promise<void> {
+  const pool = getPool();
+  await pool.execute(
+    'INSERT IGNORE INTO task_subscriptions (task_id, agent_type, created_at) VALUES (?, ?, ?)',
+    [taskId, agentType, Date.now()]
+  );
+}
+
+// ── Notifications ────────────────────────────────────────────────────────────
+
+export async function createNotification(notification: any): Promise<void> {
+  const pool = getPool();
+  await pool.execute(
+    'INSERT INTO notifications (id, recipient_agent_type, content, is_delivered, created_at) VALUES (?, ?, ?, ?, ?)',
+    [notification.id, notification.recipient_agent_type, notification.content, notification.is_delivered ? 1 : 0, notification.created_at]
+  );
+}
+
+export async function getPendingNotificationsForAgent(agentType: string): Promise<any[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute(
+    'SELECT * FROM notifications WHERE recipient_agent_type = ? AND is_delivered = 0 ORDER BY created_at ASC',
+    [agentType]
+  );
+  return rows as any[];
+}
+
+export async function markNotificationsAsDelivered(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const pool = getPool();
+  const placeholders = ids.map(() => '?').join(',');
+  await pool.execute(
+    `UPDATE notifications SET is_delivered = 1 WHERE id IN (${placeholders})`,
+    ids
+  );
+}
+
+// ── Standups & Aggregation ──────────────────────────────────────────────────
+
+export async function getTasksUpdatedSince(timestamp: number): Promise<any[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute('SELECT * FROM tasks WHERE created_at >= ? OR completed_at >= ?', [timestamp, timestamp]);
+  return rows as any[];
+}
+
+export async function getActivitiesSince(timestamp: number): Promise<any[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute('SELECT * FROM activities WHERE created_at >= ? ORDER BY created_at DESC', [timestamp]);
+  return rows as any[];
+}
+
+export async function getCommentsSince(timestamp: number): Promise<any[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute('SELECT * FROM task_comments WHERE created_at >= ? ORDER BY created_at DESC', [timestamp]);
+  return rows as any[];
+}
+
+export async function createStandup(standup: any): Promise<void> {
+  const pool = getPool();
+  await pool.execute(
+    'INSERT INTO standups (id, date_str, content, created_at) VALUES (?, ?, ?, ?)',
+    [standup.id, standup.date_str, standup.content, standup.created_at]
+  );
+}
+
+export async function getStandupByDate(dateStr: string): Promise<any | null> {
+  const pool = getPool();
+  const [rows] = await pool.execute('SELECT * FROM standups WHERE date_str = ?', [dateStr]);
+  return (rows as any[])[0] || null;
+}
+
+export async function getLatestStandup(): Promise<any | null> {
+  const pool = getPool();
+  const [rows] = await pool.execute('SELECT * FROM standups ORDER BY created_at DESC LIMIT 1');
+  return (rows as any[])[0] || null;
+}
+
+export async function getStandupHistory(): Promise<any[]> {
+  const pool = getPool();
+  const [rows] = await pool.execute('SELECT * FROM standups ORDER BY created_at DESC LIMIT 30');
+  return rows as any[];
 }

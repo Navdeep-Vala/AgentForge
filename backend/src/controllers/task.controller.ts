@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
-import { getTaskById, createTaskComment, getCommentsByTaskId, getSubAgentsByTaskId, getClarificationRequestsBySessionId, getChildTasks, updateTaskStatus as updateTaskStatusQuery } from '../db/queries';
+import { getTaskById, createTaskComment, getCommentsByTaskId, getSubAgentsByTaskId, getClarificationRequestsBySessionId, getChildTasks, updateTaskStatus as updateTaskStatusQuery, getAgentStepsByTaskId } from '../db/queries';
 import { emitSSE } from './sse.controller';
 import { CommentType, TaskComment } from '../types';
 
@@ -20,17 +20,20 @@ export async function getTaskHandler(req: Request, res: Response, next: NextFunc
       res.status(404).json({ error: 'Task not found' });
       return;
     }
-    const [comments, subAgents, clarificationRequests, childTasks] = await Promise.all([
+    const [comments, subAgents, clarificationRequests, childTasks, agentSteps] = await Promise.all([
       getCommentsByTaskId(task.id),
       getSubAgentsByTaskId(task.id),
       getClarificationRequestsBySessionId(task.session_id),
       getChildTasks(task.id),
+      getAgentStepsByTaskId(task.id),
     ]);
-    res.json({ task, comments, subAgents, clarificationRequests, childTasks });
+    res.json({ task, comments, subAgents, clarificationRequests, childTasks, agentSteps });
   } catch (err) {
     next(err);
   }
 }
+
+import { handleTaskFeedback } from '../orchestrator/orchestrator';
 
 export async function addTaskCommentHandler(
   req: Request,
@@ -65,6 +68,28 @@ export async function addTaskCommentHandler(
 
     await createTaskComment(comment);
     emitSSE(task.session_id, { type: 'task_comment', taskId: task.id, comment });
+
+    // NEW: Handle feedback/mentions
+    handleTaskFeedback(task.id, task.session_id, comment).catch(err => {
+      console.error(`[TaskController] Failed to handle feedback:`, err);
+    });
+
+    // NEW: Auto-approve detection
+    if (task.status === 'needs_approval' && parsed.data.agent_type === 'navdeep') {
+      const lowerContent = parsed.data.content.toLowerCase();
+      const approvalKeywords = ['good to go', 'looks good', 'approved', 'approve', 'lgtm', 'proceed', 'done'];
+      const isApproval = approvalKeywords.some(kw => lowerContent.includes(kw));
+      
+      if (isApproval) {
+        await updateTaskStatusQuery(task.id, 'done');
+        emitSSE(task.session_id, {
+          type: 'agent_thinking',
+          agentType: task.agent_type,
+          agentName: task.agent_name,
+          message: 'Approval detected in comment. Continuing...',
+        });
+      }
+    }
 
     res.status(201).json({ comment });
   } catch (err) {

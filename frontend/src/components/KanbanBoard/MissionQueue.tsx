@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react';
 import { BriefcaseBusiness } from 'lucide-react';
 import { useSessionStore } from '../../store/sessionStore';
 import type { Task } from '../../types';
-import { getMentionedTaskIds, getMissionLane, taskNeedsReview } from '../MissionControl/dashboardUtils';
+import { getMentionedTaskIds, getMissionLane } from '../MissionControl/dashboardUtils';
 import { KanbanColumn } from './KanbanColumn';
 
-const FILTERS = ['all', 'images', 'inbox', 'assigned', 'active', 'review', 'approval', 'done', 'waiting'] as const;
+const FILTERS = ['all', 'images', 'inbox', 'assigned', 'active', 'review', 'done', 'blocked'] as const;
 type QueueFilter = (typeof FILTERS)[number];
 
 interface MissionQueueProps {
@@ -25,8 +25,8 @@ export function MissionQueue({ onOpenTask }: MissionQueueProps) {
       in_progress: tasks.filter((task) => getMissionLane(task, comments) === 'in_progress'),
       review: tasks.filter((task) => getMissionLane(task, comments) === 'review'),
       done: tasks.filter((task) => getMissionLane(task, comments) === 'done'),
+      blocked: tasks.filter((task) => getMissionLane(task, comments) === 'blocked'),
       navdeep: tasks.filter((task) => getMissionLane(task, comments) === 'navdeep'),
-      approval: tasks.filter((task) => task.status === 'needs_approval'),
     }),
     [tasks, comments]
   );
@@ -38,10 +38,9 @@ export function MissionQueue({ onOpenTask }: MissionQueueProps) {
       if (activeFilter === 'inbox') return getMissionLane(task, comments) === 'inbox';
       if (activeFilter === 'assigned') return getMissionLane(task, comments) === 'assigned';
       if (activeFilter === 'active') return getMissionLane(task, comments) === 'in_progress';
-      if (activeFilter === 'review') return taskNeedsReview(task, comments);
-      if (activeFilter === 'approval') return task.status === 'needs_approval';
-      if (activeFilter === 'done') return task.status === 'done';
-      if (activeFilter === 'waiting') return task.status === 'todo' || mentionedTaskIds.has(task.id);
+      if (activeFilter === 'review') return getMissionLane(task, comments) === 'review';
+      if (activeFilter === 'done') return getMissionLane(task, comments) === 'done';
+      if (activeFilter === 'blocked') return getMissionLane(task, comments) === 'blocked';
       return true;
     };
 
@@ -50,14 +49,14 @@ export function MissionQueue({ onOpenTask }: MissionQueueProps) {
       assigned: columns.assigned.filter(matchesFilter),
       in_progress: columns.in_progress.filter(matchesFilter),
       review: columns.review.filter(matchesFilter),
-      approval: columns.approval.filter(matchesFilter),
       done: columns.done.filter(matchesFilter),
+      blocked: columns.blocked.filter(matchesFilter),
       navdeep: columns.navdeep.filter(matchesFilter),
     };
   }, [activeFilter, columns, comments, mentionedTaskIds]);
 
   return (
-    <main className="min-w-0 flex-1 bg-[var(--app-surface)]">
+    <main className="min-w-0 flex-1 flex flex-col bg-[var(--app-surface)]">
       <div className="flex items-center justify-between border-b border-[var(--app-border)] px-5 py-4">
         <div className="flex items-center gap-3">
           <span className="h-2 w-2 rounded-full bg-[var(--app-accent)]" />
@@ -94,13 +93,13 @@ export function MissionQueue({ onOpenTask }: MissionQueueProps) {
         </div>
       </div>
 
-      <div className="flex min-w-0 overflow-x-auto pb-6 custom-scrollbar">
+      <div className="flex flex-1 min-w-0 overflow-x-auto pb-6 custom-scrollbar h-0">
         <KanbanColumn title="Inbox" dotColor="#bbb6af" tasks={filteredColumns.inbox} comments={comments} onOpenTask={onOpenTask} />
         <KanbanColumn title="Assigned" dotColor="#c48a29" tasks={filteredColumns.assigned} comments={comments} onOpenTask={onOpenTask} />
         <KanbanColumn title="In Progress" dotColor="#2d9a6e" tasks={filteredColumns.in_progress} comments={comments} onOpenTask={onOpenTask} />
-        <KanbanColumn title="Review" dotColor="#d49a37" tasks={filteredColumns.review} comments={comments} onOpenTask={onOpenTask} />
-        <KanbanColumn title="Approval" dotColor="#4d7ed6" tasks={filteredColumns.approval} comments={comments} onOpenTask={onOpenTask} />
+        <KanbanColumn title="Review" dotColor="#4d7ed6" tasks={filteredColumns.review} comments={comments} onOpenTask={onOpenTask} />
         <KanbanColumn title="Done" dotColor="#2d9a6e" tasks={filteredColumns.done} comments={comments} onOpenTask={onOpenTask} />
+        <KanbanColumn title="Blocked" dotColor="#ef4444" tasks={filteredColumns.blocked} comments={comments} onOpenTask={onOpenTask} />
         <KanbanColumn title="Navdeep" dotColor="#d8a14a" tasks={filteredColumns.navdeep} comments={comments} onOpenTask={onOpenTask} />
       </div>
     </main>

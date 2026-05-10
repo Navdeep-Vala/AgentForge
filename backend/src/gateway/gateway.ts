@@ -116,11 +116,8 @@ export class Gateway {
       const agentType = match[1].toLowerCase();
       const goal = match[2];
       
-      // Check if this agent exists
-      const soulsPath = path.join(homeWorkspaceService.getHomePath(), 'souls', `${agentType}.md`);
-      // Simple check (could be more robust)
-      
       const sessionId = uuidv4();
+      this.sessionChannelMap.set(sessionId, channelId);
       await message.reply(`Routing to ${agentType}...`);
       
       // Start/Resume the session for this agent
@@ -138,6 +135,7 @@ export class Gateway {
       }
       
       const sessionId = uuidv4();
+      this.sessionChannelMap.set(sessionId, channelId);
       await message.reply(`Starting manager session...`);
       
       startSession(sessionId, goal, undefined, undefined, undefined, 'main', 'manager').catch(async (err) => {
@@ -159,6 +157,7 @@ export class Gateway {
       return;
     }
 
+    const sessionId = this.getSessionForChannel(channelId);
     if (!sessionId) {
       await message.reply('No active session. Use /start <goal> to begin.');
       return;

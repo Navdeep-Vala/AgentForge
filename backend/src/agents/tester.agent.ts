@@ -1,11 +1,11 @@
-import { BaseAgent } from './base.agent';
+import { BaseAgent } from "./base.agent";
 
 export class TesterAgent extends BaseAgent {
-  readonly type = 'tester';
-  readonly name = 'Tester';
-  readonly color = '#F59E0B';
-  readonly icon = 'TestTube';
-  readonly model = 'meta-llama/llama-3.3-70b-instruct:free';
+  readonly type = "tester";
+  readonly name = "Tester";
+  readonly color = "#F59E0B";
+  readonly icon = "TestTube";
+  readonly model = "meta-llama/llama-3.3-70b-instruct:free";
   readonly systemPrompt = `You are the Tester agent on a multi-agent development team.
 
 Your responsibilities:

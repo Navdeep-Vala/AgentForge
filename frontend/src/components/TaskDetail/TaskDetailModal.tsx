@@ -7,6 +7,7 @@ import type { Task, TaskComment, SubAgent, ClarificationRequest } from '../../ty
 import { formatDateTime, formatTimeAgo, taskComments } from '../MissionControl/dashboardUtils';
 import { MentionAutocomplete } from '../Notifications/MentionAutocomplete';
 import { MentionText } from '../Notifications/MentionText';
+import { useSessionStore } from '../../store/sessionStore';
 
 interface TaskDetailModalProps {
   task: Task;
@@ -14,10 +15,12 @@ interface TaskDetailModalProps {
   subAgents: SubAgent[];
   clarificationRequests: ClarificationRequest[];
   childTasks: Task[];
+  agentSteps?: any[];
   onClose: () => void;
 }
 
-export function TaskDetailModal({ task, comments, subAgents, clarificationRequests, childTasks, onClose }: TaskDetailModalProps) {
+export function TaskDetailModal({ task, comments, subAgents, clarificationRequests, childTasks, agentSteps = [], onClose }: TaskDetailModalProps) {
+  const { addComment } = useSessionStore();
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const conversation = useMemo(() => taskComments(task.id, comments), [task.id, comments]);
@@ -27,13 +30,20 @@ export function TaskDetailModal({ task, comments, subAgents, clarificationReques
     if (!content || submitting) return;
     setSubmitting(true);
     try {
-      await addTaskComment(task.id, {
+      const { comment } = await addTaskComment(task.id, {
         agent_type: 'navdeep',
         agent_name: 'Navdeep',
         content,
         comment_type: 'review',
       });
+      
+      // Update local store immediately for better UX
+      addComment(comment);
+      
+      // Clear draft
       setDraft('');
+    } catch (err) {
+      console.error('Failed to post comment:', err);
     } finally {
       setSubmitting(false);
     }
@@ -240,6 +250,46 @@ export function TaskDetailModal({ task, comments, subAgents, clarificationReques
             <TimelineRow label="Started" value={formatDateTime(task.started_at)} />
             <TimelineRow label="Updated" value={formatTimeAgo(task.completed_at ?? task.started_at ?? task.created_at)} />
           </Section>
+
+          {agentSteps.length > 0 && (
+            <Section title={`Execution History (${agentSteps.length} steps)`}>
+              <div className="space-y-4">
+                {agentSteps.map((step) => (
+                  <div key={step.id} className="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-col)] overflow-hidden shadow-[var(--app-shadow-card)]">
+                    <div className="flex items-center justify-between bg-[var(--app-surface)] px-4 py-3 border-b border-[var(--app-border)]">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--app-accent-soft)] text-[10px] font-bold text-[var(--app-accent)]">
+                          {step.step_number}
+                        </span>
+                        <p className="text-[14px] font-semibold text-[var(--app-text)]">{step.tool_name}</p>
+                      </div>
+                      <span className="text-[11px] text-[var(--app-muted)]">{formatTimeAgo(step.created_at)}</span>
+                    </div>
+                    
+                    <div className="p-4 space-y-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--app-muted)]">Arguments</p>
+                        <pre className="mt-1.5 overflow-x-auto rounded-[12px] bg-black/5 p-3 font-mono text-[12px] text-[var(--app-sub)]">
+                          {JSON.stringify(step.tool_args, null, 2)}
+                        </pre>
+                      </div>
+                      
+                      {step.tool_output && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--app-muted)]">Output</p>
+                          <div className="mt-1.5 rounded-[12px] border border-[var(--app-border)] bg-[var(--app-surface)] p-3 text-[13px] leading-6 text-[var(--app-sub)]">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {step.tool_output.length > 2000 ? `${step.tool_output.substring(0, 2000)}... (truncated)` : step.tool_output}
+                            </ReactMarkdown>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
 
           <Section title={`Comments (${conversation.length})`}>
             <div className="space-y-4">

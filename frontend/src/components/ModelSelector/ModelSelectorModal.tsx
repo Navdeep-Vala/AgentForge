@@ -8,7 +8,7 @@ interface Props {
 }
 
 const BUILT_IN_AGENTS = [
-  { type: 'manager',    label: 'Manager',    color: '#EC4899', defaultModel: 'meta-llama/llama-3.3-70b-instruct:free', isCustom: false },
+  { type: 'manager',    label: 'Manager',    color: '#d8892d', defaultModel: 'meta-llama/llama-3.3-70b-instruct:free', isCustom: false },
   { type: 'researcher', label: 'Researcher', color: '#3B82F6', defaultModel: 'google/gemma-4-31b-it:free', isCustom: false },
   { type: 'coder',      label: 'Coder',      color: '#10B981', defaultModel: 'qwen/qwen3-coder:free', isCustom: false },
   { type: 'tester',     label: 'Tester',     color: '#F59E0B', defaultModel: 'meta-llama/llama-3.3-70b-instruct:free', isCustom: false },
@@ -41,15 +41,23 @@ export function ModelSelectorModal({ onClose }: Props) {
     setEditingType(null);
   };
 
-  const activeCustomAgents = customAgents.filter(a => a.is_active).map(a => ({
+  const allAgentsFromBackend = customAgents.filter(a => a.is_active).map(a => ({
     type: a.type,
     label: a.name,
     color: a.color || '#6B7280',
     defaultModel: a.model,
-    isCustom: true
+    isCustom: !a.is_builtin
   }));
 
-  const allAgents = [...BUILT_IN_AGENTS, ...activeCustomAgents];
+  // Merge built-in fallbacks with backend data, preferring backend data
+  const allAgents = BUILT_IN_AGENTS.map(builtIn => {
+    const fromBackend = allAgentsFromBackend.find(a => a.type === builtIn.type);
+    return fromBackend || builtIn;
+  });
+
+  // Add any truly custom agents from backend that aren't in BUILT_IN_AGENTS
+  const trulyCustom = allAgentsFromBackend.filter(a => !BUILT_IN_AGENTS.some(b => b.type === a.type));
+  allAgents.push(...trulyCustom);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs" onClick={onClose}>

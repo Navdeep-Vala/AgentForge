@@ -1,5 +1,5 @@
 export type SessionStatus = 'pending' | 'running' | 'completed' | 'cancelled' | 'failed';
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled' | 'needs_approval' | 'waiting_for_predecessor';
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled' | 'needs_approval' | 'waiting_for_predecessor' | 'blocked';
 export type CommentType = 'insight' | 'review' | 'refute' | 'praise' | 'question' | 'clarification';
 
 export const SUB_AGENT_TYPES = ['file_checker', 'error_checker', 'test_runner', 'code_reviewer', 'security_auditor'] as const;
@@ -33,6 +33,8 @@ export interface Session {
   total_tokens_used: number;
   estimated_cost_usd: number;
   heartbeat_interval_minutes: number;
+  sandbox_container_id?: string | null;
+  sandbox_status?: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -232,6 +234,16 @@ export interface SSETaskCommentEvent {
   comment: TaskComment;
 }
 
+export interface SSENotificationCreatedEvent {
+  type: 'notification_created';
+  notification: {
+    id: string;
+    recipient_agent_type: string;
+    content: string;
+    created_at: number;
+  };
+}
+
 export interface SSEChatMessageEvent {
   type: 'chat_message';
   message: ChatMessage;
@@ -279,6 +291,7 @@ export interface SSESessionStatusChangedEvent {
 
 export interface SSEAgentThinkingEvent {
   type: 'agent_thinking';
+  taskId?: string;
   agentType: string;
   agentName: string;
   message: string;
@@ -361,13 +374,7 @@ export interface SSEApprovalResponseEvent {
   feedback: string;
 }
 
-export interface SSEFileChangedEvent {
-  type: 'file_changed';
-  sessionId: string;
-  taskId: string;
-  filePath: string;
-  changeType: 'created' | 'modified' | 'deleted';
-}
+
 
 export interface SSESpecializedAgentSpawnedEvent {
   type: 'specialized_agent_spawned';
@@ -377,12 +384,22 @@ export interface SSESpecializedAgentSpawnedEvent {
   description: string;
 }
 
+export interface SSEModelRetryEvent {
+  type: 'model_retry';
+  agentType: string;
+  agentName: string;
+  previousModel: string;
+  nextModel?: string;
+  message: string;
+}
+
 export type SSEEvent =
   | SSETaskCreatedEvent
   | SSETaskClaimedEvent
   | SSETaskCompleteEvent
   | SSETaskFailedEvent
   | SSETaskCommentEvent
+  | SSENotificationCreatedEvent
   | SSEChatMessageEvent
   | SSETaskSpawnedEvent
   | SSESessionCompleteEvent
@@ -400,7 +417,8 @@ export type SSEEvent =
   | SSEClarificationRequestEvent
   | SSEClarificationResponseEvent
   | SSEApprovalResponseEvent
-  | SSESpecializedAgentSpawnedEvent;
+  | SSESpecializedAgentSpawnedEvent
+  | SSEModelRetryEvent;
 
 // ─── Model / OpenRouter ───────────────────────────────────────────────────────
 

@@ -8,14 +8,22 @@ const gatewayConfigSchema = z.object({
     port: z.number().default(3001),
     host: z.string().default('0.0.0.0'),
     name: z.string().default('AgentForge Gateway'),
+  }).default({
+    port: 3001,
+    host: '0.0.0.0',
+    name: 'AgentForge Gateway'
   }),
   ai: z.object({
     default_provider: z.string().default('openrouter'),
     default_model: z.string().default('meta-llama/llama-3.3-70b-instruct:free'),
-    providers: z.record(z.object({
+    providers: z.record(z.string(), z.object({
       base_url: z.string().optional(),
       api_key: z.string().optional(),
-    })),
+    })).default({}),
+  }).default({
+    default_provider: 'openrouter',
+    default_model: 'meta-llama/llama-3.3-70b-instruct:free',
+    providers: {}
   }),
   channels: z.object({
     telegram: z.object({
@@ -29,6 +37,8 @@ const gatewayConfigSchema = z.object({
     web: z.object({
       enabled: z.boolean().default(true),
     }).default({ enabled: true }),
+  }).default({
+    web: { enabled: true }
   }),
   tools: z.object({
     enabled_tools: z.array(z.string()).default([]),
@@ -36,10 +46,15 @@ const gatewayConfigSchema = z.object({
       type: z.enum(['docker', 'local']).default('docker'),
       persist_workspace: z.boolean().default(true),
     }).default({ type: 'docker', persist_workspace: true }),
+  }).default({
+    enabled_tools: [],
+    sandbox: { type: 'docker', persist_workspace: true }
   }),
   workspace: z.object({
     base_path: z.string().default('./workspaces'),
     default_system_prompt_path: z.string().optional(),
+  }).default({
+    base_path: './workspaces'
   }),
 });
 
@@ -66,6 +81,7 @@ export function loadGatewayConfig(): GatewayConfig {
         }
       },
       channels: { web: { enabled: true } },
+      tools: {},
       workspace: { base_path: './workspaces' }
     });
     return config;

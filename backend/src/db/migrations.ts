@@ -243,5 +243,68 @@ export async function runMigrations(): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
+  // ── Activities ──────────────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS activities (
+      id VARCHAR(36) PRIMARY KEY,
+      session_id VARCHAR(36),
+      task_id VARCHAR(36),
+      agent_type VARCHAR(100),
+      agent_name VARCHAR(100),
+      type VARCHAR(50) NOT NULL,
+      message TEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // ── Documents ───────────────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS documents (
+      id VARCHAR(36) PRIMARY KEY,
+      task_id VARCHAR(36),
+      title VARCHAR(255) NOT NULL,
+      content LONGTEXT NOT NULL,
+      type VARCHAR(50) NOT NULL DEFAULT 'deliverable',
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // ── Notifications ────────────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id VARCHAR(36) PRIMARY KEY,
+      recipient_agent_type VARCHAR(100),
+      content TEXT NOT NULL,
+      is_delivered TINYINT(1) DEFAULT 0,
+      created_at BIGINT NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // ── Task Subscriptions ──────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS task_subscriptions (
+      task_id VARCHAR(36) NOT NULL,
+      agent_type VARCHAR(100) NOT NULL,
+      created_at BIGINT NOT NULL,
+      PRIMARY KEY (task_id, agent_type),
+      FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // ── Standups ────────────────────────────────────────────────────────────────
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS standups (
+      id VARCHAR(36) PRIMARY KEY,
+      date_str VARCHAR(20) NOT NULL,
+      content LONGTEXT NOT NULL,
+      created_at BIGINT NOT NULL,
+      UNIQUE KEY uk_date (date_str)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
   console.log('[DB] Migrations completed');
 }

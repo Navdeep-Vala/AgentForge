@@ -1,3 +1,5 @@
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { WorkspaceManager } from '../workspace/workspace.manager';
 import { FileService } from '../workspace/file.service';
 import { DockerService } from '../sandbox/docker.service';
@@ -22,6 +24,7 @@ import { getActiveCustomAgents, resolveAgent } from './agent.registry';
 import { env } from '../config/env';
 import { WebSearchService } from '../services/web-search.service';
 import { historyService } from '../services/history.service';
+import { homeWorkspaceService } from '../services/home-workspace.service';
 
 export interface AgentTaskResult {
   content: string;
@@ -539,7 +542,30 @@ export async function executeAgenticTask(
     gitService || undefined,
     webSearchService,
     dockerServiceInstance,
-    sessionId
+    sessionId,
+    {
+      addTaskComment: async (content: string, type?: string) => {
+        const commentId = uuidv4();
+        await queries.createTaskComment({
+          id: commentId,
+          task_id: taskId,
+          session_id: sessionId,
+          agent_type: agentType,
+          agent_name: agentName,
+          content,
+          comment_type: (type as any) || 'info',
+          tokens_used: 0,
+          created_at: Date.now(),
+        });
+
+        // Trigger notifications for @mentions and subscribers
+        const { notificationService } = await import('../services/notification.service');
+        await notificationService.handleNewComment(taskId, sessionId, agentType, content);
+      },
+      getTaskComments: async (limit?: number) => {
+        return await queries.getCommentsByTaskId(taskId);
+      }
+    }
   );
 
   const projectTree = await workspace.getProjectTree();
@@ -549,9 +575,53 @@ export async function executeAgenticTask(
   const fallbackAgent = (await getActiveCustomAgents())[0];
   let basePrompt = resolved?.systemPrompt ?? `You are the ${agentName} agent (${agentType}).`;
 
-  // Fetch soul from HomeWorkspace
+  // Fetch soul and heartbeat protocol
   const soulContent = await homeWorkspaceService.getSoul(agentType);
-  let systemPrompt = `${soulContent}\n\nCORE DIRECTIVES:\n${basePrompt}`;
+  const heartbeatMd = await fs.readFile(path.join(homeWorkspaceService.getHomePath(), 'HEARTBEAT.md'), 'utf8').catch(() => '');
+  
+  let systemPrompt = `${soulContent}\n\n${heartbeatMd}\n\nCORE DIRECTIVES:\n${basePrompt}`;
+
+  // NEW: Inject SCM (Self-Correcting Memory)
+  try {
+    const lessonsLearned = await fileService.readFile('lessons_learned.json').catch(() => null);
+    if (lessonsLearned) {
+      systemPrompt += `\n\nLESSONS LEARNED FROM PREVIOUS TASKS (SCM):\n${lessonsLearned}`;
+    }
+
+    // Inject Agent-Specific Memory Stack
+    const memoryPath = homeWorkspaceService.getMemoryPath(agentType);
+    
+    // 1. Working Memory
+    const workingMd = await fs.readFile(path.join(memoryPath, 'WORKING.md'), 'utf8').catch(() => null);
+    if (workingMd) {
+      systemPrompt += `\n\nAGENT WORKING MEMORY (WORKING.md):\n${workingMd}`;
+    }
+
+    // 2. Daily Note (YYYY-MM-DD.md)
+    const today = new Date().toISOString().split('T')[0];
+    const dailyNote = await fs.readFile(path.join(memoryPath, `${today}.md`), 'utf8').catch(() => null);
+    if (dailyNote) {
+      systemPrompt += `\n\nAGENT DAILY LOG (${today}.md):\n${dailyNote}`;
+    }
+
+    // 3. Long-term Memory (MEMORY.md)
+    const longTermMemory = await fs.readFile(path.join(memoryPath, 'MEMORY.md'), 'utf8').catch(() => null);
+    if (longTermMemory) {
+      systemPrompt += `\n\nAGENT LONG-TERM MEMORY (MEMORY.md):\n${longTermMemory}`;
+    }
+
+    // 4. Pending Notifications (Urgent Alerts)
+    const { notificationService } = await import('../services/notification.service');
+    const pendingNotifications = await notificationService.getPendingNotifications(agentType);
+    if (pendingNotifications.length > 0) {
+      const notificationsContext = pendingNotifications
+        .map(n => `- ${n.content}`)
+        .join('\n');
+      systemPrompt += `\n\nURGENT NOTIFICATIONS & @MENTIONS:\n${notificationsContext}\n\nACTION REQUIRED: Address these mentions in your next response.`;
+    }
+  } catch (e) {
+    // Ignore if file doesn't exist
+  }
 
   if (projectContext) {
     systemPrompt += `\n\nPROJECT CONTEXT:\n${projectContext.slice(0, 30_000)}`;
@@ -579,6 +649,18 @@ export async function executeAgenticTask(
     // If this is a new message (not just resuming), log the system and user prompt
     await historyService.appendMessage(sessionKey, { role: 'system', content: systemPrompt, name: agentName });
     await historyService.appendMessage(sessionKey, { role: 'user', content: taskDescription, name: agentName });
+  }
+
+  // Fetch and inject shared task comments (Mission Control)
+  const taskComments = await queries.getCommentsByTaskId(taskId);
+  if (taskComments.length > 0) {
+    const commentsContext = taskComments
+      .map((c: any) => `[${c.agent_name}]: ${c.content}`)
+      .join('\n');
+    systemPrompt += `\n\nSHARED COMMUNICATION RECORD (MISSION CONTROL):\n${commentsContext}`;
+    
+    // Update the system message in the array
+    messages[0].content = systemPrompt;
   }
 
   messages.push({ role: 'user', content: buildUserPrompt(taskDescription, projectTree) });
@@ -696,7 +778,16 @@ export async function executeAgenticTask(
       await historyService.appendMessage(sessionKey, { role: 'assistant', content, name: agentName });
     }
     const thoughtText = content.replace(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/gs, '').trim();
-    if (thoughtText) thoughts.push(thoughtText);
+    if (thoughtText) {
+      thoughts.push(thoughtText);
+      emitSSE(sessionId, {
+        type: 'agent_thinking',
+        agentType,
+        agentName,
+        taskId,
+        message: `Thought: ${thoughtText.slice(0, 500)}${thoughtText.length > 500 ? '...' : ''}`
+      });
+    }
 
     // 1. Handle native tool calls if present
     let toolCall: { tool: string; args: any } | null = null;
@@ -737,6 +828,14 @@ export async function executeAgenticTask(
         toolName: toolCall.tool,
         toolArgs: toolCall.args,
         iteration: i + 1,
+      });
+
+      emitSSE(sessionId, {
+        type: 'agent_thinking',
+        taskId,
+        agentType,
+        agentName,
+        message: `Executing tool: ${toolCall.tool}...`,
       });
 
       const stepId = uuidv4();

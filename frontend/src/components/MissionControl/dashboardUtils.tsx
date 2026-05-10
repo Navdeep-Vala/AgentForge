@@ -91,6 +91,7 @@ export function getAgentCatalog(agents: AgentDefinition[], session: Session | nu
   const seen = new Set<string>(['manager']);
 
   for (const agent of agents) {
+    if (seen.has(agent.type)) continue;
     const fallback = DEFAULT_AGENT_META[agent.type];
     items.push({
       type: agent.type,
@@ -154,8 +155,9 @@ export function taskNeedsUserAttention(task: Task, comments: Record<string, Task
 }
 
 export function getMissionLane(task: Task, comments: Record<string, TaskComment[]>): string {
+  if (task.status === 'blocked') return 'blocked';
   if (taskNeedsUserAttention(task, comments)) return 'navdeep';
-  if (taskNeedsReview(task, comments)) return 'review';
+  if (task.status === 'needs_approval' || taskNeedsReview(task, comments)) return 'review';
   if (task.status === 'done') return 'done';
   if (task.status === 'in_progress') return 'in_progress';
   if (task.spawned_by_agent) return 'assigned';

@@ -1,12 +1,12 @@
-import { BaseAgent } from './base.agent';
-import { TOOL_USAGE_PROMPT } from './tool-prompt';
+import { BaseAgent } from "./base.agent";
+import { TOOL_USAGE_PROMPT } from "./tool-prompt";
 
 export class CoderAgent extends BaseAgent {
-  readonly type = 'coder';
-  readonly name = 'Coder';
-  readonly color = '#10B981';
-  readonly icon = 'Code2';
-  readonly model = 'qwen/qwen3-coder:free';
+  readonly type = "coder";
+  readonly name = "Coder";
+  readonly color = "#10B981";
+  readonly icon = "Code2";
+  readonly model = "qwen/qwen3-coder:free";
   readonly systemPrompt = `You are a Senior Software Engineer. You deliver exactly what the user requests, using the most appropriate tools and technologies for the task.
 
 ${TOOL_USAGE_PROMPT}

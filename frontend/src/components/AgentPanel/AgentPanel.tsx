@@ -3,6 +3,7 @@ import { useSessionStore } from '../../store/sessionStore';
 import { useAgentStore } from '../../store/agentStore';
 
 const BUILT_IN_AGENTS = [
+  { type: 'manager', name: 'Manager', color: '#d8892d', icon: 'Zap' },
   { type: 'researcher', name: 'Researcher', color: '#3B82F6', icon: 'Search' },
   { type: 'coder', name: 'Coder', color: '#10B981', icon: 'Code2' },
   { type: 'tester', name: 'Tester', color: '#F59E0B', icon: 'TestTube' },
@@ -11,7 +12,7 @@ const BUILT_IN_AGENTS = [
 
 export function AgentPanel() {
   const { currentSession } = useSessionStore();
-  const { agents: customAgents } = useAgentStore();
+  const { agents: backendAgents } = useAgentStore();
   const tasks = currentSession?.tasks ?? [];
 
   const getAgentStatus = (type: string): { status: 'idle' | 'working' | 'done'; task?: string } => {
@@ -24,12 +25,9 @@ export function AgentPanel() {
     return { status: 'idle' };
   };
 
-  const allAgents = [
-    ...BUILT_IN_AGENTS,
-    ...customAgents
-      .filter((a) => a.is_active !== false && !a.is_builtin)
-      .map((a) => ({ type: a.type, name: a.name, color: a.color, icon: a.icon })),
-  ];
+  const allAgents = backendAgents.length > 0 
+    ? backendAgents.filter(a => a.is_active !== false)
+    : BUILT_IN_AGENTS;
 
   const relevantAgents = currentSession
     ? allAgents.filter((a) => tasks.some((t) => t.agent_type === a.type) || true)

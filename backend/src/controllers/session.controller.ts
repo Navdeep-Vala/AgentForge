@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+import * as path from 'path';
+import * as fs from 'fs';
 import {
   getAllSessions,
   getSessionById,
@@ -151,6 +153,41 @@ export async function addSessionChatMessageHandler(
     emitSSE(session.id, { type: 'chat_message', message });
 
     res.status(201).json({ message });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function downloadWorkspaceFileHandler(
+  req: Request<{ id: string, filepath: string | string[] }>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const params = req.params as any;
+    const sessionId = params.id || params[0];
+    const filepath = params.filepath || params[1];
+    
+    const session = await getSessionById(sessionId);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+    const workspaceDir = session.workspace_dir || `/tmp/mission-control/workspaces/${session.id}`;
+    const normalizedFilepath = Array.isArray(filepath) ? filepath.join('/') : filepath;
+    const filePath = path.join(workspaceDir, normalizedFilepath);
+    
+    if (!path.normalize(filePath).startsWith(path.normalize(workspaceDir))) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+    
+    res.download(filePath);
   } catch (err) {
     next(err);
   }

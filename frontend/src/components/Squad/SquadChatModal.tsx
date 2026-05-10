@@ -5,6 +5,9 @@ import type { ChatMessage } from '../../types';
 import { formatTimeAgo } from '../MissionControl/dashboardUtils';
 import { MentionAutocomplete } from '../Notifications/MentionAutocomplete';
 import { MentionText } from '../Notifications/MentionText';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { useSessionStore } from '../../store/sessionStore';
 
 interface SquadChatModalProps {
   sessionId: string | null;
@@ -179,7 +182,9 @@ export function BroadcastModal({ sessionId, onClose }: BroadcastModalProps) {
   );
 }
 
+
 export function DocsModal({ onClose }: { onClose: () => void }) {
+  const { currentSession } = useSessionStore();
   const docs = [
     'README.md',
     'PRD-AgentForge.md',
@@ -188,16 +193,35 @@ export function DocsModal({ onClose }: { onClose: () => void }) {
   ];
 
   return (
-    <Shell title="Docs" onClose={onClose}>
-      <div className="space-y-4">
-        {docs.map((doc) => (
-          <div key={doc} className="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-col)] px-4 py-4">
-            <p className="text-[15px] font-semibold text-[var(--app-text)]">{doc}</p>
-            <p className="mt-2 text-[13px] leading-6 text-[var(--app-sub)]">
-              Available in the workspace for product, mission, and implementation context.
-            </p>
+    <Shell title="Docs & Reports" onClose={onClose}>
+      <div className="max-h-[60vh] space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+        {currentSession?.final_report && (
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-[13px] font-bold uppercase tracking-[0.2em] text-[var(--app-accent)]">Mission Final Report</h3>
+              <span className="rounded-full bg-[var(--app-accent-soft)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--app-accent)]">Ready</span>
+            </div>
+            <div className="rounded-[24px] border border-[var(--app-accent)]/30 bg-[var(--app-surface)] p-6 shadow-sm">
+              <div className="prose prose-sm prose-invert max-w-none text-[14px] leading-7 text-[var(--app-sub)]">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentSession.final_report}</ReactMarkdown>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section>
+          <h3 className="mb-3 text-[13px] font-bold uppercase tracking-[0.2em] text-[var(--app-muted)]">Project Documentation</h3>
+          <div className="space-y-3">
+            {docs.map((doc) => (
+              <div key={doc} className="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-col)] px-4 py-4">
+                <p className="text-[15px] font-semibold text-[var(--app-text)]">{doc}</p>
+                <p className="mt-2 text-[13px] leading-6 text-[var(--app-sub)]">
+                  Available in the workspace for product, mission, and implementation context.
+                </p>
+              </div>
+            ))}
           </div>
-        ))}
+        </section>
       </div>
     </Shell>
   );

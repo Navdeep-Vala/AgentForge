@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Search, Code2, TestTube, BarChart2, Bot } from 'lucide-react';
+import { Search, Code2, TestTube, BarChart2, Bot, Zap, Crown } from 'lucide-react';
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Search,
@@ -7,6 +7,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   TestTube,
   BarChart2,
   Bot,
+  Zap,
+  Crown,
 };
 
 interface AgentBadgeProps {

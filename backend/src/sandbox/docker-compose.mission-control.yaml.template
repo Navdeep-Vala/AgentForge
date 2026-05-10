@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  app-service:
+    image: ${APP_IMAGE}
+    volumes:
+      - ${WORKSPACE_PATH}:/workspace
+    networks:
+      - mission-net
+    working_dir: /workspace
+    environment:
+      - NODE_ENV=development
+
+  db-service:
+    image: ${DB_IMAGE}
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME}
+      - MYSQL_USER=${DB_USER}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - ${SEEDS_PATH}:/docker-entrypoint-initdb.d
+    networks:
+      - mission-net
+
+  tester-service:
+    image: mcr.microsoft.com/playwright:v1.40.0-focal
+    volumes:
+      - ${WORKSPACE_PATH}:/workspace
+    networks:
+      - mission-net
+    working_dir: /workspace
+
+networks:
+  mission-net:
+    internal: true

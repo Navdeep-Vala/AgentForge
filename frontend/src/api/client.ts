@@ -86,8 +86,22 @@ export async function deleteAgent(id: string): Promise<void> {
   await api.delete(`/agents/${id}`);
 }
 
-export async function getTask(taskId: string): Promise<{ task: unknown; comments: TaskComment[] }> {
-  const res = await api.get<{ task: unknown; comments: TaskComment[] }>(`/tasks/${taskId}`);
+export async function getTask(taskId: string): Promise<{ 
+  task: any; 
+  comments: TaskComment[]; 
+  subAgents: SubAgent[]; 
+  clarificationRequests: ClarificationRequest[]; 
+  childTasks: any[]; 
+  agentSteps: any[]; 
+}> {
+  const res = await api.get<{ 
+    task: any; 
+    comments: TaskComment[]; 
+    subAgents: SubAgent[]; 
+    clarificationRequests: ClarificationRequest[]; 
+    childTasks: any[]; 
+    agentSteps: any[]; 
+  }>(`/tasks/${taskId}`);
   return res.data;
 }
 

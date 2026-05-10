@@ -6,9 +6,14 @@ import { MentionText } from '../Notifications/MentionText';
 
 type FeedFilter = 'all' | 'tasks' | 'comments' | 'docs' | 'status';
 
-export function LiveFeed() {
+interface LiveFeedProps {
+  onOpenTask: (taskId: string) => void;
+  onOpenDocs: () => void;
+}
+
+export function LiveFeed({ onOpenTask, onOpenDocs }: LiveFeedProps) {
   const { events } = useFeedStore();
-  const { comments, chatMessages } = useSessionStore();
+  const { comments, chatMessages, currentSession } = useSessionStore();
   const [activeFilter, setActiveFilter] = useState<FeedFilter>('all');
   const [activeAgent, setActiveAgent] = useState<string>('all');
 
@@ -38,6 +43,8 @@ export function LiveFeed() {
         content: event.message,
         agent: event.agentName ?? 'System',
         created_at: event.timestamp,
+        taskId: event.taskId,
+        color: event.agentColor,
       })),
       ...getUserMentions(chatMessages, comments).map((mention) => ({
         id: `mention-${mention.id}`,
@@ -45,6 +52,8 @@ export function LiveFeed() {
         content: mention.content,
         agent: mention.agent_name,
         created_at: mention.created_at,
+        taskId: mention.task_id,
+        color: undefined,
       })),
       ...allComments.map((comment) => ({
         id: `comment-${comment.id}`,
@@ -52,13 +61,15 @@ export function LiveFeed() {
         content: comment.content,
         agent: comment.agent_name,
         created_at: comment.created_at,
+        taskId: comment.task_id,
+        color: undefined,
       })),
     ].sort((a, b) => b.created_at - a.created_at);
 
     return combined.filter((item) => {
       if (activeAgent !== 'all' && item.agent.toLowerCase() !== activeAgent) return false;
       if (activeFilter === 'all') return true;
-      if (activeFilter === 'tasks') return item.type.includes('task');
+      if (activeFilter === 'tasks') return item.type.includes('task') || item.type === 'manager_working';
       if (activeFilter === 'comments') return item.type === 'comment' || item.type === 'chat_message';
       if (activeFilter === 'docs') return /doc|deliverable|file|report/i.test(item.content);
       if (activeFilter === 'status') return /running|done|paused|active|complete|failed/i.test(item.content);
@@ -104,16 +115,53 @@ export function LiveFeed() {
             </div>
           ) : (
             feedItems.map((item) => (
-              <article key={item.id} className="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[var(--app-shadow-card)]">
+              <article 
+                key={item.id} 
+                onClick={() => {
+                  if (item.taskId) onOpenTask(item.taskId);
+                  else if (item.type === 'session_complete' || /doc|report|deliverable/i.test(item.content)) onOpenDocs();
+                }}
+                className={`rounded-[18px] border border-[var(--app-border)] bg-[var(--app-surface)] px-4 py-4 shadow-[var(--app-shadow-card)] transition ${(item.taskId || item.type === 'session_complete' || /doc|report|deliverable/i.test(item.content)) ? 'cursor-pointer hover:border-[var(--app-accent)] hover:shadow-[var(--app-shadow-card-md)]' : ''}`}
+              >
                 <div className="flex items-start gap-3">
-                  <span className="mt-1.5 h-2 w-2 rounded-full bg-[var(--app-muted)]" />
+                  <span 
+                    className="mt-1.5 h-2 w-2 rounded-full" 
+                    style={{ backgroundColor: item.color || 'var(--app-muted)' }}
+                  />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-semibold leading-tight text-[var(--app-text)]">
-                      {item.agent}
-                    </p>
-                    <div className="mt-1.5 text-[13px] leading-relaxed text-[var(--app-sub)]">
-                      <MentionText content={item.content} />
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[14px] font-semibold leading-tight text-[var(--app-text)]">
+                        {item.agent}
+                      </p>
+                      {item.type === 'status' && (
+                        <span className="rounded-full bg-[var(--app-accent-soft)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-[var(--app-accent)]">
+                          System
+                        </span>
+                      )}
                     </div>
+                    {item.content.startsWith('Thought:') ? (
+                      <div className="mt-1.5 text-[13px] leading-relaxed text-[var(--app-sub)] italic border-l-2 border-[var(--app-accent)] pl-2">
+                        <MentionText content={item.content.replace('Thought: ', '')} />
+                      </div>
+                    ) : item.type === 'file_changed' && item.content.startsWith('File created:') ? (
+                      <div className="mt-1.5 text-[13px] leading-relaxed text-[var(--app-sub)]">
+                        File created:{' '}
+                        <a 
+                          href={`${import.meta.env.VITE_API_URL || 'http://localhost:3000/api'}/sessions/${currentSession?.id}/workspace/${item.content.replace('File created: ', '').split('/').map(part => encodeURIComponent(part)).join('/')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[var(--app-accent)] hover:underline inline-flex items-center gap-1 mt-1 bg-[var(--app-surface-hover)] px-2 py-1 rounded"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                          Download {item.content.split('/').pop()}
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="mt-1.5 text-[13px] leading-relaxed text-[var(--app-sub)]">
+                        <MentionText content={item.content} />
+                      </div>
+                    )}
                     <p className="mt-3 text-[10px] uppercase tracking-[0.14em] text-[var(--app-muted)] font-bold">{formatTimeAgo(item.created_at)}</p>
                   </div>
                 </div>

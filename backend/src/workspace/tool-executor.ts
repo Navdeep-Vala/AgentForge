@@ -16,7 +16,11 @@ export class ToolExecutor {
     private gitService?: GitService,
     private webSearchService?: WebSearchService,
     private dockerService?: DockerService,
-    private sessionId?: string
+    private sessionId?: string,
+    private callbacks?: {
+      addTaskComment?: (content: string, type?: string) => Promise<void>;
+      getTaskComments?: (limit?: number) => Promise<any[]>;
+    }
   ) {}
 
   async execute(toolName: string, args: any): Promise<ToolResult> {
@@ -109,17 +113,19 @@ export class ToolExecutor {
           let fileName = '';
           let runCmd = [];
           
-          if (args.language === 'javascript' || args.language === 'nodejs') {
+          const language = args.language || 'javascript';
+          
+          if (language === 'javascript' || language === 'nodejs') {
             fileName = 'temp_exec.js';
             runCmd = ['node', fileName];
-          } else if (args.language === 'typescript') {
+          } else if (language === 'typescript') {
             fileName = 'temp_exec.ts';
             runCmd = ['npx', 'tsx', fileName];
-          } else if (args.language === 'python') {
+          } else if (language === 'python') {
             fileName = 'temp_exec.py';
             runCmd = ['python3', fileName];
           } else {
-            throw new Error(`Unsupported language: ${args.language}`);
+            throw new Error(`Unsupported language: ${language}`);
           }
 
           // Write file to workspace first
@@ -135,6 +141,40 @@ export class ToolExecutor {
             success: execResult.exitCode === 0,
             output: `STDOUT:\n${execResult.stdout}\n\nSTDERR:\n${execResult.stderr}`,
           };
+
+        case 'persist_learning':
+          const learning = {
+            agent: args.agent,
+            failure_mode: args.failure_mode,
+            correction: args.correction,
+            efficiency_gain: args.efficiency_gain,
+            timestamp: new Date().toISOString()
+          };
+          
+          let existingLearnings = [];
+          try {
+            const currentContent = await this.fileService.readFile('lessons_learned.json');
+            existingLearnings = JSON.parse(currentContent);
+            if (!Array.isArray(existingLearnings)) existingLearnings = [];
+          } catch (e) {
+            // File doesn't exist or is invalid, start new array
+          }
+          
+          existingLearnings.push(learning);
+          await this.fileService.writeFile('lessons_learned.json', JSON.stringify(existingLearnings, null, 2));
+          return { success: true, output: 'Learning persisted to lessons_learned.json.' };
+        
+        case 'add_task_comment':
+          if (!this.callbacks?.addTaskComment) throw new Error('Task communication not available');
+          await this.callbacks.addTaskComment(args.content, args.comment_type);
+          return { success: true, output: 'Comment posted to Mission Control.' };
+        
+        case 'get_task_comments':
+          if (!this.callbacks?.getTaskComments) throw new Error('Task communication not available');
+          const comments = await this.callbacks.getTaskComments(args.limit);
+          const commentsOutput = comments.map(c => `[${c.agent_name}]: ${c.content}`).join('\n---\n');
+          return { success: true, output: commentsOutput || 'No comments found.' };
+
           
         default:
           return { success: false, output: `Unknown tool: ${toolName}` };

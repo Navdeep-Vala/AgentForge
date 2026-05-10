@@ -1,13 +1,20 @@
-import { BaseAgent } from './base.agent';
-import { ResearcherAgent } from './researcher.agent';
-import { CoderAgent } from './coder.agent';
-import { TesterAgent } from './tester.agent';
-import { RndAgent } from './rnd.agent';
-import { routeModelCall } from '../services/model-router.service';
-import { getActiveCustomAgents as dbGetActiveCustomAgents, getCustomAgentByType } from '../db/queries';
-import { CustomAgent, BuiltInAgentDefinition, AgentOverride } from '../types';
+import { BaseAgent } from "./base.agent";
+import { ResearcherAgent } from "./researcher.agent";
+import { CoderAgent } from "./coder.agent";
+import { TesterAgent } from "./tester.agent";
+import { RndAgent } from "./rnd.agent";
+import { ManagerAgent } from "./manager.agent";
+
+import { routeModelCall } from "../services/model-router.service";
+import {
+  getActiveCustomAgents as dbGetActiveCustomAgents,
+  getCustomAgentByType,
+} from "../db/queries";
+import { CustomAgent, BuiltInAgentDefinition, AgentOverride } from "../types";
+import { getDynamicFallbacks } from "../services/free-model-pool.service";
 
 const BUILT_IN_AGENTS: Record<string, BaseAgent> = {
+  manager: new ManagerAgent(),
   researcher: new ResearcherAgent(),
   coder: new CoderAgent(),
   tester: new TesterAgent(),
@@ -23,17 +30,19 @@ export function getBuiltInAgentDefinitions(): BuiltInAgentDefinition[] {
     model: a.model,
     color: a.color,
     icon: a.icon,
+    is_active: true,
   }));
 }
 
 function getBuiltInDescription(type: string): string {
   const descriptions: Record<string, string> = {
-    researcher: 'Researches features, libraries, and best practices',
-    coder: 'Writes production-ready TypeScript/Node.js/React code',
-    tester: 'Writes unit tests, integration tests, and edge cases',
-    rnd: 'Analyzes competitors and suggests improvements',
+    manager: "Orchestrates complex tasks and delegates to specialists",
+    researcher: "Researches features, libraries, and best practices",
+    coder: "Writes production-ready TypeScript/Node.js/React code",
+    tester: "Writes unit tests, integration tests, and edge cases",
+    rnd: "Analyzes competitors and suggests improvements",
   };
-  return descriptions[type] ?? 'Specialized AI agent';
+  return descriptions[type] ?? "Specialized AI agent";
 }
 
 export const getActiveCustomAgents = dbGetActiveCustomAgents;
@@ -50,15 +59,19 @@ export async function getActiveAgentDescriptions(): Promise<string> {
     lines.push(`- ${ca.type}: ${ca.description}`);
   }
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 export async function resolveAgent(
-  agentType: string
+  agentType: string,
 ): Promise<{ systemPrompt: string; model: string; name: string } | null> {
   if (BUILT_IN_AGENTS[agentType]) {
     const agent = BUILT_IN_AGENTS[agentType];
-    return { systemPrompt: agent.systemPrompt, model: agent.model, name: agent.name };
+    return {
+      systemPrompt: agent.systemPrompt,
+      model: agent.model,
+      name: agent.name,
+    };
   }
 
   const customAgent = await getCustomAgentByType(agentType);
@@ -73,10 +86,6 @@ export async function resolveAgent(
   return null;
 }
 
-import { getDynamicFallbacks } from '../services/free-model-pool.service';
-
-import { executeAgenticTask, AgentTaskResult } from './agentic-loop';
-
 export async function executeAgentTask(
   agentType: string,
   taskDescription: string,
@@ -87,125 +96,180 @@ export async function executeAgentTask(
   modelOverride?: string,
   containerId?: string,
   projectContext?: string,
-  sessionKey?: string
-): Promise<AgentTaskResult> {
+  sessionKey?: string,
+): Promise<any> {
   const resolved = await resolveAgent(agentType);
-  const fallbackAgent = BUILT_IN_AGENTS['researcher'];
-  const { systemPrompt, model: defaultModel, name: agentName } = resolved ?? {
+  const fallbackAgent = BUILT_IN_AGENTS["researcher"];
+  const {
+    systemPrompt,
+    model: defaultModel,
+    name: agentName,
+  } = resolved ?? {
     systemPrompt: fallbackAgent.systemPrompt,
     model: fallbackAgent.model,
-    name: 'Agent',
+    name: "Agent",
   };
 
   const primaryModel = modelOverride ?? defaultModel;
 
-   // Use Agentic Loop if workspace is provided
-   if (workspaceDir && sessionId && taskId) {
-     return executeAgenticTask(
-       sessionId,
-       taskId,
-       agentType,
-       agentName,
-       taskDescription,
-       workspaceDir,
-       signal as AbortSignal,
-       primaryModel,
-       containerId,
-       undefined,
-       projectContext,
-       sessionKey
-     );
-   }
+  // Use Agentic Loop if workspace is provided
+  if (workspaceDir && sessionId && taskId) {
+    // Break circular dependency with dynamic import
+    const { executeAgenticTask } = await import("./agentic-loop");
+    return executeAgenticTask(
+      sessionId,
+      taskId,
+      agentType,
+      agentName,
+      taskDescription,
+      workspaceDir,
+      signal as AbortSignal,
+      primaryModel,
+      containerId,
+      undefined,
+      projectContext,
+      sessionKey,
+    );
+  }
 
   const triedModels: string[] = [];
-  let lastError: Error = new Error('All models failed for task execution');
+  let lastError: Error = new Error("All models failed for task execution");
 
   // Step 1: Try the primary (user-selected or default) model
   triedModels.push(primaryModel);
   if (!signal?.aborted) {
     try {
-      console.log(`[${agentType}] Executing with primary model: ${primaryModel}`);
+      console.log(
+        `[${agentType}] Executing with primary model: ${primaryModel}`,
+      );
       const result = await routeModelCall(
         primaryModel,
         [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: taskDescription },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: taskDescription },
         ],
         4096,
-        signal
+        signal,
       );
-      
-      const content = result.content || '';
-      
+
+      const content = result.content || "";
+
       // Log to history if sessionKey is provided
       if (sessionKey) {
-        const { historyService } = await import('../services/history.service');
-        await historyService.appendMessage(sessionKey, { role: 'user', content: taskDescription, name: agentName });
-        await historyService.appendMessage(sessionKey, { role: 'assistant', content, name: agentName });
+        const { historyService } = await import("../services/history.service");
+        await historyService.appendMessage(sessionKey, {
+          role: "user",
+          content: taskDescription,
+          name: agentName,
+        });
+        await historyService.appendMessage(sessionKey, {
+          role: "assistant",
+          content,
+          name: agentName,
+        });
       }
 
-      const thought = content.replace(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/gs, '').trim();
-      
-      return { 
+      const thought = content
+        .replace(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/gs, "")
+        .trim();
+
+      return {
         content,
         thought,
-        tokensUsed: result.tokensUsed, 
-        modelUsed: primaryModel 
+        tokensUsed: result.tokensUsed,
+        modelUsed: primaryModel,
       };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
+      const isRetryable =
+        lastError.message.includes("429") ||
+        lastError.message.includes("rate limit") ||
+        lastError.message.includes("empty content");
       if (!isRetryable) throw lastError;
-      console.warn(`[${agentType}] Primary model ${primaryModel} unavailable, fetching dynamic fallbacks...`);
+      if (sessionId) {
+        const { emitSSE } = await import("../controllers/sse.controller");
+        emitSSE(sessionId, { 
+          type: "model_retry", 
+          agentType, 
+          agentName, 
+          previousModel: primaryModel,
+          message: `Primary model ${primaryModel} failed. Retrying with fallbacks...` 
+        });
+      }
+      console.warn(
+        `[${agentType}] Primary model ${primaryModel} unavailable, fetching dynamic fallbacks...`,
+      );
     }
   }
 
   // Step 2: Dynamically discover all available free models and try each
   const dynamicFallbacks = await getDynamicFallbacks(triedModels);
-  console.log(`[${agentType}] Dynamic fallback pool: ${dynamicFallbacks.length} models available`);
+  console.log(
+    `[${agentType}] Dynamic fallback pool: ${dynamicFallbacks.length} models available`,
+  );
 
-  for (const model of dynamicFallbacks) {
-    if (signal?.aborted) throw new Error('Request aborted by user');
+    for (const model of dynamicFallbacks) {
+    if (signal?.aborted) throw new Error("Request aborted by user");
     triedModels.push(model);
+    if (sessionId) {
+      const { emitSSE } = await import("../controllers/sse.controller");
+      emitSSE(sessionId, { 
+        type: "model_retry", 
+        agentType, 
+        agentName, 
+        previousModel: triedModels[triedModels.length - 2],
+        nextModel: model,
+        message: `Retrying with fallback: ${model}...` 
+      });
+    }
     try {
       console.log(`[${agentType}] Trying fallback model: ${model}`);
       const result = await routeModelCall(
         model,
         [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: taskDescription },
+          { role: "system", content: systemPrompt },
+          { role: "user", content: taskDescription },
         ],
         4096,
-        signal
+        signal,
       );
-      const content = result.content || '';
-      const thought = content.replace(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/gs, '').trim();
+      const content = result.content || "";
+      const thought = content
+        .replace(/\{"tool":\s*".+?",\s*"args":\s*\{.*?\}\}/gs, "")
+        .trim();
 
-      return { 
+      return {
         content,
         thought,
-        tokensUsed: result.tokensUsed, 
-        modelUsed: model 
+        tokensUsed: result.tokensUsed,
+        modelUsed: model,
       };
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      const isRetryable = lastError.message.includes('429') || lastError.message.includes('rate limit') || lastError.message.includes('empty content');
+      const isRetryable =
+        lastError.message.includes("429") ||
+        lastError.message.includes("rate limit") ||
+        lastError.message.includes("empty content");
       if (isRetryable) {
-        console.warn(`[${agentType}] Fallback model ${model} also unavailable, trying next...`);
+        console.warn(
+          `[${agentType}] Fallback model ${model} also unavailable, trying next...`,
+        );
         continue;
       }
       throw lastError;
     }
   }
 
-  console.error(`[${agentType}] All ${triedModels.length} models exhausted. Tried: ${triedModels.join(', ')}`);
+  console.error(
+    `[${agentType}] All ${triedModels.length} models exhausted. Tried: ${triedModels.join(", ")}`,
+  );
   throw lastError;
 }
 
 export function getAgentDisplayInfo(
   agentType: string,
   customAgentMap: Map<string, CustomAgent>,
-  agentOverrides?: Record<string, AgentOverride>
+  agentOverrides?: Record<string, AgentOverride>,
 ): { name: string; color: string; icon: string } {
   const override = agentOverrides?.[agentType];
   const builtIn = BUILT_IN_AGENTS[agentType];
@@ -227,5 +291,5 @@ export function getAgentDisplayInfo(
     };
   }
 
-  return { name: agentType, color: '#6B7280', icon: 'Bot' };
+  return { name: agentType, color: "#6B7280", icon: "Bot" };
 }

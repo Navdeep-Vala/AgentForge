@@ -13,6 +13,7 @@ import {
 } from "./components/Squad/SquadChatModal";
 import { TaskDetailModal } from "./components/TaskDetail/TaskDetailModal";
 import { ProjectContextModal } from "./components/ProjectSelector/ProjectContextModal";
+import { DailyStandupModal } from "./components/DailyStandup/DailyStandupModal";
 import {
   MentionToasts,
   type MentionToast,
@@ -36,10 +37,12 @@ export default function App() {
   const [agentManagerOpen, setAgentManagerOpen] = useState(false);
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [projectContextOpen, setProjectContextOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [dailyStandupOpen, setDailyStandupOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<AgentCatalogItem | null>(
     null,
   );
+  const [selectedTaskSteps, setSelectedTaskSteps] = useState<any[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
@@ -76,10 +79,27 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (selectedTaskId) {
+      import("./api/client").then(({ getTask }) => {
+        getTask(selectedTaskId).then((data) => {
+          setSelectedTaskSteps(data.agentSteps);
+        });
+      });
+    } else {
+      setSelectedTaskSteps([]);
+    }
+  }, [selectedTaskId]);
+
   const agentCatalog = useMemo(
     () => getAgentCatalog(agents, currentSession),
     [agents, currentSession],
   );
+
+  const selectedTask = useMemo(() => {
+    if (!selectedTaskId || !currentSession?.tasks) return null;
+    return (currentSession.tasks as Task[]).find(t => t.id === selectedTaskId) || null;
+  }, [selectedTaskId, currentSession?.tasks]);
   const userMentions = useMemo(
     () => getUserMentions(chatMessages, comments),
     [chatMessages, comments],
@@ -202,6 +222,7 @@ export default function App() {
         onOpenBroadcast={() => setBroadcastOpen(true)}
         onOpenDocs={() => setDocsOpen(true)}
         onOpenContext={() => setProjectContextOpen(true)}
+        onOpenStandup={() => setDailyStandupOpen(true)}
         onPause={handlePause}
         mentionCount={userMentions.length + clarificationRequests.filter((c: ClarificationRequest) => c.status === 'pending').length + approvalToasts.length}
       />
@@ -211,8 +232,8 @@ export default function App() {
           selectedAgentType={selectedAgent?.type ?? null}
           onSelectAgent={setSelectedAgent}
         />
-        <MissionQueue onOpenTask={setSelectedTask} />
-        <LiveFeed />
+        <MissionQueue onOpenTask={(task) => setSelectedTaskId(task.id)} />
+        <LiveFeed onOpenTask={(taskId) => setSelectedTaskId(taskId)} onOpenDocs={() => setDocsOpen(true)} />
       </div>
 
       {selectedTask && (
@@ -222,7 +243,8 @@ export default function App() {
           subAgents={(currentSession as any).subAgents ?? []}
           clarificationRequests={clarificationRequests}
           childTasks={[]}
-          onClose={() => setSelectedTask(null)}
+          agentSteps={selectedTaskSteps}
+          onClose={() => setSelectedTaskId(null)}
         />
       )}
 
@@ -235,7 +257,7 @@ export default function App() {
           chatMessages={chatMessages}
           subAgentIds={selectedAgentSubAgentIds}
           onClose={() => setSelectedAgent(null)}
-          onOpenTask={setSelectedTask}
+          onOpenTask={(task) => setSelectedTaskId(task.id)}
           onLaunchMission={handleLaunchMission}
         />
       )}
@@ -261,6 +283,10 @@ export default function App() {
       {modelSelectorOpen && (
         <ModelSelectorModal onClose={() => setModelSelectorOpen(false)} />
       )}
+      <DailyStandupModal 
+        isOpen={dailyStandupOpen} 
+        onClose={() => setDailyStandupOpen(false)} 
+      />
 
       <MentionToasts
         toasts={toasts}

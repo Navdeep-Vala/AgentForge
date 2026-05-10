@@ -216,7 +216,7 @@ export const AGENT_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'execute_code',
-    description: 'Execute JavaScript, TypeScript, or Python code in a safe Docker sandbox. Use this to test logic, perform calculations, or validate code snippets.',
+    description: 'Execute JavaScript, TypeScript, or Python code in a safe Docker sandbox. Use Python for data processing, Excel/CSV generation, and automation scripts. Use JS/TS for logic testing and web-related snippets.',
     parameters: {
       type: 'object',
       properties: {
@@ -224,6 +224,42 @@ export const AGENT_TOOLS: ToolDefinition[] = [
         code: { type: 'string', description: 'The code to execute' },
       },
       required: ['language', 'code'],
+    },
+  },
+  {
+    name: 'persist_learning',
+    description: 'Document a lesson learned after completing a task or encountering a significant error. This will be stored in lessons_learned.json and used to improve agent performance in future tasks.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agent: { type: 'string', description: 'The agent name (e.g., Coder, Tester)' },
+        failure_mode: { type: 'string', description: 'Description of the failure or inefficiency encountered' },
+        correction: { type: 'string', description: 'How to avoid this issue in the future' },
+        efficiency_gain: { type: 'string', description: 'Expected benefit of this correction' },
+      },
+      required: ['agent', 'failure_mode', 'correction', 'efficiency_gain'],
+    },
+  },
+  {
+    name: 'add_task_comment',
+    description: 'Post a comment to the shared Mission Control record for this task. Use this to share progress, ask questions to other agents, or mention (@AgentName) specific colleagues. All agents can see these comments.',
+    parameters: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'The content of the comment. Use @AgentName to mention others.' },
+        comment_type: { type: 'string', description: 'Optional: info | warning | success | question (default: info)' },
+      },
+      required: ['content'],
+    },
+  },
+  {
+    name: 'get_task_comments',
+    description: 'Retrieve the shared communication record for this task. Returns all comments posted by humans and other agents.',
+    parameters: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Optional limit of comments to return (default 50)' },
+      },
     },
   },
 ];

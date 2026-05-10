@@ -1,5 +1,5 @@
 export type SessionStatus = 'pending' | 'running' | 'completed' | 'cancelled';
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled' | 'needs_approval' | 'waiting_for_predecessor';
+export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'failed' | 'cancelled' | 'needs_approval' | 'waiting_for_predecessor' | 'blocked';
 export type CommentType = 'insight' | 'review' | 'refute' | 'praise' | 'question' | 'clarification';
 
 export interface Project {
@@ -178,7 +178,8 @@ export type SSEMessage =
   | { type: 'session_complete'; final_report: string; total_tokens: number; cost_usd: number }
   | { type: 'heartbeat_tick'; agentType: string; tasksScanned: number }
   | { type: 'session_status_changed'; status: SessionStatus }
-  | { type: 'agent_thinking'; agentType: string; agentName: string; message: string }
+  | { type: 'agent_thinking'; taskId?: string; agentType: string; agentName: string; message: string }
+  | { type: 'model_retry'; agentType: string; agentName: string; previousModel: string; nextModel?: string; message: string }
   | { type: 'manager_working'; message: string }
   | {
       type: 'agent_tool_use';
@@ -211,7 +212,6 @@ export type SSEMessage =
   | { type: 'needs_approval'; taskId: string; approval_type: string; details: Record<string, any> }
   | { type: 'approval_response'; taskId: string; approved: boolean; feedback: string }
   | { type: 'specialized_agent_spawned'; taskId: string; agentType: string; agentName: string; description: string }
-  | { type: 'file_changed'; sessionId: string; taskId: string; filePath: string; changeType: 'created' | 'modified' | 'deleted' }
   | { type: 'error'; taskId: string; message: string };
 
 // ─── Model selector ───────────────────────────────────────────────────────────
