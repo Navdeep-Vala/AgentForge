@@ -12,7 +12,8 @@ export interface CommandResult {
 
 export class CommandService {
   private readonly allowedCommands = [
-    'npm', 'npx', 'node', 'git', 'ls', 'cat', 'grep', 'find', 'mkdir', 'touch', 'rm', 'cp', 'mv'
+    'npm', 'npx', 'node', 'git', 'ls', 'cat', 'grep', 'find', 'mkdir', 'touch', 'rm', 'cp', 'mv',
+    'python3', 'python', 'pip3', 'pip', 'curl', 'wget', 'unzip', 'tar',
   ];
 
   constructor(private workspace: WorkspaceManager) {}

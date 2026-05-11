@@ -11,6 +11,7 @@ interface SessionState {
   subAgents: SubAgent[];
   clarificationRequests: ClarificationRequest[];
   childTasks: Record<string, string[]>; // keyed by parent_task_id
+  agentSteps: Record<string, any[]>; // keyed by task_id
   isLoading: boolean;
   error: string | null;
 
@@ -40,6 +41,9 @@ interface SessionState {
   addChildTask: (parentTaskId: string, childTaskId: string) => void;
   setChildTasks: (parentTaskId: string, childTaskIds: string[]) => void;
 
+  setAgentSteps: (taskId: string, steps: any[]) => void;
+  addAgentStep: (taskId: string, step: any) => void;
+
   reset: () => void;
 }
 
@@ -50,6 +54,7 @@ interface SessionSliceState {
   subAgents: SubAgent[];
   clarificationRequests: ClarificationRequest[];
   childTasks: Record<string, string[]>;
+  agentSteps: Record<string, any[]>;
   isLoading: boolean;
   error: string | null;
 }
@@ -61,6 +66,7 @@ const initialState: SessionSliceState = {
   subAgents: [],
   clarificationRequests: [],
   childTasks: {},
+  agentSteps: {},
   isLoading: false,
   error: null,
 };
@@ -176,6 +182,19 @@ const sessionSlice = createSlice({
         [action.payload.parentTaskId]: action.payload.childTaskIds,
       };
     },
+    setAgentSteps(state, action: PayloadAction<{ taskId: string; steps: any[] }>) {
+      state.agentSteps = {
+        ...state.agentSteps,
+        [action.payload.taskId]: action.payload.steps,
+      };
+    },
+    addAgentStep(state, action: PayloadAction<{ taskId: string; step: any }>) {
+      const existing = state.agentSteps[action.payload.taskId] ?? [];
+      state.agentSteps = {
+        ...state.agentSteps,
+        [action.payload.taskId]: [...existing, action.payload.step],
+      };
+    },
     reset() {
       return initialState;
     },
@@ -201,6 +220,8 @@ export const {
   updateSubAgentStatus,
   addChildTask,
   setChildTasks,
+  setAgentSteps,
+  addAgentStep,
   reset,
 } = sessionSlice.actions;
 
@@ -318,6 +339,18 @@ export function useSessionStore(): SessionState {
     },
     [dispatch]
   );
+  const boundSetAgentSteps = useCallback(
+    (taskId: string, steps: any[]) => {
+      dispatch(setAgentSteps({ taskId, steps }));
+    },
+    [dispatch]
+  );
+  const boundAddAgentStep = useCallback(
+    (taskId: string, step: any) => {
+      dispatch(addAgentStep({ taskId, step }));
+    },
+    [dispatch]
+  );
   const boundReset = useCallback(() => {
     dispatch(reset());
   }, [dispatch]);
@@ -343,6 +376,8 @@ export function useSessionStore(): SessionState {
       updateSubAgentStatus: boundUpdateSubAgentStatus,
       addChildTask: boundAddChildTask,
       setChildTasks: boundSetChildTasks,
+      setAgentSteps: boundSetAgentSteps,
+      addAgentStep: boundAddAgentStep,
       reset: boundReset,
     }),
     [
@@ -364,6 +399,8 @@ export function useSessionStore(): SessionState {
       boundAddClarificationRequest,
       boundAddChildTask,
       boundSetChildTasks,
+      boundSetAgentSteps,
+      boundAddAgentStep,
       boundReset,
     ]
   );

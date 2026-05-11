@@ -42,7 +42,6 @@ export default function App() {
   const [selectedAgent, setSelectedAgent] = useState<AgentCatalogItem | null>(
     null,
   );
-  const [selectedTaskSteps, setSelectedTaskSteps] = useState<any[]>([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [broadcastOpen, setBroadcastOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
@@ -50,7 +49,7 @@ export default function App() {
   const [clarificationToasts, setClarificationToasts] = useState<ClarificationToast[]>([]);
   const [approvalToasts, setApprovalToasts] = useState<ApprovalToast[]>([]);
 
-  const { currentSession, chatMessages, comments, clarificationRequests } = useSessionStore();
+  const { currentSession, chatMessages, comments, clarificationRequests, agentSteps, setAgentSteps } = useSessionStore();
   const { startSession, stopSession } = useSession();
   const { theme } = useThemeStore();
   const { agents } = useAgentStore();
@@ -83,11 +82,9 @@ export default function App() {
     if (selectedTaskId) {
       import("./api/client").then(({ getTask }) => {
         getTask(selectedTaskId).then((data) => {
-          setSelectedTaskSteps(data.agentSteps);
+          setAgentSteps(selectedTaskId, data.agentSteps ?? []);
         });
       });
-    } else {
-      setSelectedTaskSteps([]);
     }
   }, [selectedTaskId]);
 
@@ -243,7 +240,7 @@ export default function App() {
           subAgents={(currentSession as any).subAgents ?? []}
           clarificationRequests={clarificationRequests}
           childTasks={[]}
-          agentSteps={selectedTaskSteps}
+          agentSteps={agentSteps[selectedTaskId ?? ''] ?? []}
           onClose={() => setSelectedTaskId(null)}
         />
       )}

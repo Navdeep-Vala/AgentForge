@@ -15,6 +15,8 @@ export interface FeedEvent {
     | 'session_complete'
     | 'session_started'
     | 'manager_working'
+    | 'agent_tool_use'
+    | 'agent_tool_result'
     | 'sub_agent_started'
     | 'sub_agent_complete'
     | 'sub_agent_failed'

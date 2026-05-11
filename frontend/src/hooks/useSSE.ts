@@ -32,6 +32,7 @@ export function useSSE(sessionId: string | null): void {
     setClarificationRequests,
     clarificationRequests,
     updateSubAgentStatus,
+    addAgentStep,
   } = useSessionStore();
   const { addEvent } = useFeedStore();
   const esRef = useRef<EventSource | null>(null);
@@ -217,12 +218,25 @@ export function useSSE(sessionId: string | null): void {
           break;
 
         case 'sub_agent_spawned':
-          addSubAgent(msg.subAgent);
+          addSubAgent({
+            id: msg.subAgentId,
+            task_id: msg.taskId,
+            session_id: sessionId ?? '',
+            sub_agent_type: msg.subAgentType,
+            title: msg.title,
+            description: '',
+            status: 'running',
+            output: null,
+            started_at: Date.now(),
+            completed_at: null,
+            created_at: Date.now(),
+          });
           addEvent({
             type: 'sub_agent_started',
-            message: `Sub-agent started: ${msg.subAgent.title}`,
-            agentName: msg.subAgent.title,
-            agentColor: getAgentColor(msg.subAgent.sub_agent_type),
+            message: `Sub-agent started: ${msg.title} (${msg.subAgentType})`,
+            agentName: msg.title,
+            agentColor: getAgentColor(msg.subAgentType),
+            taskId: msg.taskId,
           });
           break;
 
@@ -236,27 +250,45 @@ export function useSSE(sessionId: string | null): void {
           break;
 
         case 'sub_agent_failed':
+          updateSubAgentStatus(msg.subAgentId, 'failed');
           addEvent({
             type: 'sub_agent_failed',
-            message: msg.error,
+            message: `Sub-agent failed: ${msg.title ?? msg.subAgentType ?? msg.subAgentId}`,
             agentColor: '#EF4444',
+            taskId: msg.taskId,
           });
           break;
 
-        case 'clarification_request':
-          addClarificationRequest(msg.clarification);
+        case 'clarification_request': {
+          const clarification = {
+            id: msg.requestId,
+            session_id: sessionId ?? '',
+            task_id: msg.taskId,
+            agent_type: msg.agentType,
+            agent_name: msg.agentName,
+            question: msg.question,
+            response: null,
+            responding_agent_type: null,
+            responding_agent_name: null,
+            status: 'pending' as const,
+            created_at: Date.now(),
+            responded_at: null,
+          };
+          addClarificationRequest(clarification);
           addEvent({
             type: 'clarification_request',
-            message: `Clarification needed: ${msg.clarification.question}`,
-            agentName: msg.clarification.agent_name,
-            agentColor: getAgentColor(msg.clarification.agent_type),
+            message: `Clarification needed: ${msg.question}`,
+            agentName: msg.agentName,
+            agentColor: getAgentColor(msg.agentType),
+            taskId: msg.taskId,
           });
           break;
+        }
 
         case 'clarification_response':
           setClarificationRequests(
             clarificationRequests.map((c) =>
-              c.id === msg.clarificationId
+              c.id === msg.requestId
                 ? { ...c, status: 'answered', response: msg.response, responded_at: Date.now() }
                 : c
             )
@@ -264,8 +296,9 @@ export function useSSE(sessionId: string | null): void {
           addEvent({
             type: 'clarification_response',
             message: `Clarified: ${msg.response}`,
-            agentName: msg.answeredBy.agent_name,
-            agentColor: getAgentColor(msg.answeredBy.agent_type),
+            agentName: 'Agent',
+            agentColor: '#6B7280',
+            taskId: msg.taskId,
           });
           break;
 
@@ -306,6 +339,38 @@ export function useSSE(sessionId: string | null): void {
             message: `${msg.changeType === 'created' ? 'File created' : 'File deleted'}: ${msg.filePath}`,
             agentName: 'System',
             agentColor: '#6366F1',
+            taskId: msg.taskId,
+          });
+          break;
+
+        case 'agent_tool_use':
+          addEvent({
+            type: 'agent_tool_use',
+            message: `Using tool: ${msg.toolName} (iteration ${msg.iteration})`,
+            agentName: msg.agentType,
+            agentColor: getAgentColor(msg.agentType),
+            taskId: msg.taskId,
+          });
+          break;
+
+        case 'agent_tool_result':
+          addEvent({
+            type: 'agent_tool_result',
+            message: `${msg.toolName}: ${msg.success ? 'success' : 'failed'} — ${msg.output.slice(0, 200)}${msg.output.length > 200 ? '…' : ''}`,
+            agentName: msg.agentType,
+            agentColor: msg.success ? getAgentColor(msg.agentType) : '#EF4444',
+            taskId: msg.taskId,
+          });
+          addAgentStep(msg.taskId, {
+            id: `sse-${msg.taskId}-${Date.now()}`,
+            task_id: msg.taskId,
+            tool_name: msg.toolName,
+            tool_args: null,
+            tool_output: msg.output,
+            step_number: 0,
+            tokens_used: 0,
+            duration_ms: 0,
+            created_at: Date.now(),
           });
           break;
 

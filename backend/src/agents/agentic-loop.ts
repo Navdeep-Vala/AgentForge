@@ -538,7 +538,7 @@ export async function executeAgenticTask(
 
   const toolExecutor = new ToolExecutor(
     fileService,
-    containerId ? new CommandService(workspace) : (commandService as CommandService),
+    commandService, // SandboxCommandService when Docker is available, local CommandService otherwise
     gitService || undefined,
     webSearchService,
     dockerServiceInstance,
@@ -565,7 +565,8 @@ export async function executeAgenticTask(
       getTaskComments: async (limit?: number) => {
         return await queries.getCommentsByTaskId(taskId);
       }
-    }
+    },
+    !!containerId // sandboxed: only true when running inside a Docker container
   );
 
   const projectTree = await workspace.getProjectTree();

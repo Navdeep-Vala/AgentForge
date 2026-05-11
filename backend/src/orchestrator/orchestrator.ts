@@ -72,6 +72,9 @@ export async function startSession(
   
   const soulContent = await homeWorkspaceService.getSoul(agentType);
 
+  // Always create a local workspace so the agentic loop is used for every session
+  const effectiveWorkspaceDir = workspaceDir ?? `/tmp/agentforge/sessions/${sessionId}`;
+
   const now = Date.now();
   const session: Session = {
     id: sessionId,
@@ -80,7 +83,7 @@ export async function startSession(
     project_id: projectId || null,
     goal,
     status: 'pending',
-    workspace_dir: workspaceDir || null,
+    workspace_dir: effectiveWorkspaceDir,
     final_report: null,
     total_tokens_used: 0,
     estimated_cost_usd: 0,
@@ -95,13 +98,15 @@ export async function startSession(
     content: `${soulContent}\n\nSession started. Goal: ${goal}`,
   });
 
-  // NEW: Docker container provisioning
   let containerId: string | null = null;
   const dockerService = new DockerService();
   const provisioner = new WorkspaceProvisioner(dockerService);
 
   try {
     await createSession(session);
+
+    // Ensure workspace directory exists (required for agentic loop on every session)
+    await fs.mkdir(effectiveWorkspaceDir, { recursive: true });
 
     // Inject project context into goal for LLM calls (best-effort)
     let enrichedGoal = goal;
@@ -206,10 +211,9 @@ export async function startSession(
       });
     }
 
-    // NEW: Provision Mission Control workspace
-    if (workspaceDir || projectId) {
-      const effectiveWorkspaceDir = workspaceDir || `/tmp/mission-control/workspaces/${sessionId}`;
-      const project = projectId ? await getProjectById(projectId) : null;
+    // Optional: Docker + Mission Control provisioning (only when a Git repo project is configured)
+    if (projectId) {
+      const project = await getProjectById(projectId).catch(() => null);
       const seedsPath = `/tmp/mission-control/seeds/${sessionId}`;
 
       try {
@@ -223,10 +227,10 @@ export async function startSession(
 
         // 2. Detect technologies
         const tech = await detectTechnologies(effectiveWorkspaceDir);
-        
+
         // 3. Stop the initial single container and start Mission Control
         await dockerService.destroySandbox(containerId);
-        
+
         await dockerService.startMissionControl({
           sessionId,
           appImage: tech.appImage,
@@ -240,7 +244,7 @@ export async function startSession(
 
         // 4. Get the new app container ID
         containerId = await dockerService.getMissionControlContainerId(sessionId, effectiveWorkspaceDir, 'app-service');
-        
+
         // 5. Generate project map (ag-refresh equivalent)
         const workspace = new WorkspaceManager(effectiveWorkspaceDir);
         const projectTree = await workspace.getProjectTree(5);
@@ -250,17 +254,9 @@ export async function startSession(
         // Save container ID to session
         await updateSessionContainerId(sessionId, containerId);
       } catch (err) {
-        console.error(`[Orchestrator] Failed to provision Mission Control workspace:`, err);
-        await updateSessionStatus(sessionId, 'cancelled', Date.now());
-        emitSSE(sessionId, {
-          type: 'error',
-          taskId: '',
-          message: `Failed to provision Mission Control workspace: ${err instanceof Error ? err.message : err}`,
-        });
-        closeSseConnection(sessionId);
-        abortControllers.delete(sessionId);
-        sessionGoals.delete(sessionId);
-        return;
+        // Docker not installed or unavailable — continue with local workspace
+        console.warn(`[Orchestrator] Docker provisioning unavailable, continuing with local workspace at ${effectiveWorkspaceDir}:`, err instanceof Error ? err.message : err);
+        containerId = null;
       }
     }
 
@@ -269,12 +265,12 @@ export async function startSession(
       sessionId,
       enrichedGoal,
       session.heartbeat_interval_minutes,
-      dispatchSpawnedTask(sessionId, workspaceDir, signal, containerId, agentOverrides, sessionKey),
+      dispatchSpawnedTask(sessionId, effectiveWorkspaceDir, signal, containerId, agentOverrides, sessionKey),
       agentOverrides
     );
 
-    // Run all initial tasks in parallel
-    const taskPromises = taskRecords.map((task) => runTask(task, sessionId, workspaceDir || undefined, signal, agentOverrides, containerId || undefined, sessionKey));
+    // Run all initial tasks in parallel (always with effectiveWorkspaceDir to enable agentic loop)
+    const taskPromises = taskRecords.map((task) => runTask(task, sessionId, effectiveWorkspaceDir, signal, agentOverrides, containerId || undefined, sessionKey));
     const results = await Promise.allSettled(taskPromises);
 
     // Check if any tasks need approval before synthesis
@@ -319,7 +315,7 @@ export async function startSession(
     let finalReport: string;
     try {
       emitSSE(sessionId, { type: 'manager_working', message: 'Synthesizing final report...' });
-      finalReport = await managerAgent.synthesize(goal, taskOutputs, signal, agentOverrides?.manager?.modelId);
+      finalReport = await managerAgent.synthesize(goal, taskOutputs, signal, agentOverrides?.manager?.modelId, sessionId);
     } catch (err) {
       finalReport = `## Final Report\n\n_Synthesis failed: ${err instanceof Error ? err.message : String(err)}_\n\n${taskOutputs.map((t) => `### ${t.title}\n${t.output}`).join('\n\n')}`;
     }
@@ -350,19 +346,11 @@ export async function startSession(
     });
     closeSseConnection(sessionId);
   } finally {
-    // NEW: Cleanup Docker environment on session end
+    // Cleanup Docker environment on session end (only if Docker was provisioned)
     if (containerId) {
       try {
-        if (workspaceDir) {
-           await dockerService.stopMissionControl(sessionId, workspaceDir);
-        } else {
-           // If we didn't have workspaceDir stored, we might need it from session
-           const session = await getSessionById(sessionId);
-           if (session?.workspace_dir) {
-             await dockerService.stopMissionControl(sessionId, session.workspace_dir);
-           }
-        }
-        await dockerService.destroySandbox(containerId).catch(() => {}); // cleanup if single container
+        await dockerService.stopMissionControl(sessionId, effectiveWorkspaceDir);
+        await dockerService.destroySandbox(containerId).catch(() => {});
       } catch (err) {
         console.error('Failed to cleanup sandbox:', err);
       }

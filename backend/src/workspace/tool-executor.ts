@@ -1,5 +1,6 @@
 import { FileService } from './file.service';
 import { CommandService } from './command.service';
+import { SandboxCommandService } from './sandbox-command.service';
 import { GitService } from './git.service';
 import { WebSearchService } from '../services/web-search.service';
 import { DockerService } from '../sandbox/docker.service';
@@ -9,10 +10,15 @@ export interface ToolResult {
   output: string;
 }
 
+// Shared interface satisfied by both CommandService and SandboxCommandService
+export interface ICommandService {
+  runCommand(command: string, timeout?: number): Promise<{ stdout: string; stderr: string; exitCode: number }>;
+}
+
 export class ToolExecutor {
   constructor(
     private fileService: FileService,
-    private commandService: CommandService,
+    private commandService: ICommandService,
     private gitService?: GitService,
     private webSearchService?: WebSearchService,
     private dockerService?: DockerService,
@@ -20,7 +26,8 @@ export class ToolExecutor {
     private callbacks?: {
       addTaskComment?: (content: string, type?: string) => Promise<void>;
       getTaskComments?: (limit?: number) => Promise<any[]>;
-    }
+    },
+    private sandboxed: boolean = false
   ) {}
 
   async execute(toolName: string, args: any): Promise<ToolResult> {
@@ -49,6 +56,12 @@ export class ToolExecutor {
         
         // Command execution
         case 'run_command':
+          if (!this.sandboxed) {
+            return {
+              success: false,
+              output: 'run_command requires a Docker sandbox which is not available in this session. Use write_file to create files and deliver them via task_complete.',
+            };
+          }
           const cmdResult = await this.commandService.runCommand(args.command, args.timeout);
           return {
             success: cmdResult.exitCode === 0,
@@ -105,42 +118,47 @@ export class ToolExecutor {
           const searchOutput = searchResults.map(r => `[${r.title}](${r.link})\n${r.snippet}`).join('\n\n');
           return { success: true, output: searchOutput || 'No results found.' };
 
-        // Code Execution
-        case 'execute_code':
-          if (!this.dockerService) throw new Error('Docker service not available');
-          if (!this.sessionId) throw new Error('Session ID not available for docker execution');
-          
-          let fileName = '';
-          let runCmd = [];
-          
-          const language = args.language || 'javascript';
-          
-          if (language === 'javascript' || language === 'nodejs') {
-            fileName = 'temp_exec.js';
-            runCmd = ['node', fileName];
-          } else if (language === 'typescript') {
-            fileName = 'temp_exec.ts';
-            runCmd = ['npx', 'tsx', fileName];
-          } else if (language === 'python') {
-            fileName = 'temp_exec.py';
-            runCmd = ['python3', fileName];
-          } else {
-            throw new Error(`Unsupported language: ${language}`);
+        // Code Execution — requires Docker sandbox; disabled without container
+        case 'execute_code': {
+          if (!this.dockerService || !this.sessionId) {
+            return {
+              success: false,
+              output: 'Code execution requires a Docker sandbox which is not available in this session. Use write_file to save the code and task_complete to deliver it as a script artifact.',
+            };
           }
 
-          // Write file to workspace first
-          await this.fileService.writeFile(fileName, args.code);
-          
-          // Execute in container
-          const execResult = await this.dockerService.executeCommand(this.sessionId, runCmd);
-          
-          // Cleanup
-          await this.fileService.deleteFile(fileName).catch(() => {});
+          const language = args.language || 'javascript';
+          let fileName = '';
+          let dockerCmd: string[] = [];
+
+          if (language === 'javascript' || language === 'nodejs') {
+            fileName = args.filename || 'temp_exec.js';
+            dockerCmd = ['node', fileName];
+          } else if (language === 'typescript') {
+            fileName = args.filename || 'temp_exec.ts';
+            dockerCmd = ['npx', 'tsx', fileName];
+          } else if (language === 'python') {
+            fileName = args.filename || 'temp_exec.py';
+            dockerCmd = ['python3', fileName];
+          } else {
+            return { success: false, output: `Unsupported language: ${language}. Supported: javascript, typescript, python.` };
+          }
+
+          if (args.code) {
+            await this.fileService.writeFile(fileName, args.code);
+          }
+
+          const execResult = await this.dockerService.executeCommand(this.sessionId, dockerCmd);
+
+          if (!args.filename) {
+            await this.fileService.deleteFile(fileName).catch(() => {});
+          }
 
           return {
             success: execResult.exitCode === 0,
             output: `STDOUT:\n${execResult.stdout}\n\nSTDERR:\n${execResult.stderr}`,
           };
+        }
 
         case 'persist_learning':
           const learning = {

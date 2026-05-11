@@ -156,7 +156,8 @@ export class ManagerAgent extends BaseAgent {
     goal: string,
     taskResults: Array<{ title: string; agentName: string; output: string | null }>,
     signal?: AbortSignal,
-    modelOverride?: string
+    modelOverride?: string,
+    sessionId?: string
   ): Promise<string> {
     const taskSummaries = taskResults
       .map((t) => `## ${t.title} (by ${t.agentName})\n${t.output ?? '_No output_'}`)
@@ -176,11 +177,11 @@ export class ManagerAgent extends BaseAgent {
     // Step 1: Try the primary model
     triedModels.push(primaryModel);
     if (!signal?.aborted) {
-      emitSSE(sessionId, { 
-        type: 'agent_thinking', 
-        agentType: 'manager', 
-        agentName: 'Manager', 
-        message: 'Synthesizing final mission report...' 
+      if (sessionId) emitSSE(sessionId, {
+        type: 'agent_thinking',
+        agentType: 'manager',
+        agentName: 'Manager',
+        message: 'Synthesizing final mission report...'
       });
       try {
         console.log(`[Manager] Synthesizing with primary model: ${primaryModel}`);

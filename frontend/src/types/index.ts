@@ -204,11 +204,11 @@ export type SSEMessage =
       filePath: string;
       changeType: 'created' | 'modified' | 'deleted';
     }
-  | { type: 'sub_agent_spawned'; subAgent: SubAgent }
-  | { type: 'sub_agent_complete'; subAgentId: string; taskId: string; output: string | null; thought?: string }
-  | { type: 'sub_agent_failed'; subAgentId: string; taskId: string; error: string }
-  | { type: 'clarification_request'; clarification: ClarificationRequest }
-  | { type: 'clarification_response'; clarificationId: string; response: string; answeredBy: { agent_type: string; agent_name: string } }
+  | { type: 'sub_agent_spawned'; subAgentId: string; taskId: string; subAgentType: string; title: string }
+  | { type: 'sub_agent_complete'; subAgentId: string; taskId: string; subAgentType?: string; title?: string; output: string | null; thought?: string }
+  | { type: 'sub_agent_failed'; subAgentId: string; taskId: string; subAgentType?: string; title?: string }
+  | { type: 'clarification_request'; requestId: string; taskId: string; agentType: string; agentName: string; question: string; context: string | null; options: string[] | null; notify: boolean }
+  | { type: 'clarification_response'; requestId: string; taskId: string; response: string }
   | { type: 'needs_approval'; taskId: string; approval_type: string; details: Record<string, any> }
   | { type: 'approval_response'; taskId: string; approved: boolean; feedback: string }
   | { type: 'specialized_agent_spawned'; taskId: string; agentType: string; agentName: string; description: string }
